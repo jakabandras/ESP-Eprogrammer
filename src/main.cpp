@@ -79,6 +79,7 @@ result actHttpConnect(eventMask e, prompt &item);
 void listSPIFFS();
 void setDefConfig();
 void timerIsr();
+void parseCommand(char *command, IPAddress remoteIP, uint16_t remotePort);
 
 int sendAddress(uint16_t address);
 
@@ -316,8 +317,25 @@ void setup() {
 }
 
 void loop() {
+  IPAddress remoteIP;
+  uint16_t remotePort;
   nav.poll();
+  #ifdef ESP8266
   digitalWrite(LEDPIN, ledCtrl);
+  #endif
+  if (Myconfig.conType == 0) {
+    int packetSize = udp.parsePacket();
+    if (packetSize) {
+      char packetBuffer[255];
+      int len = udp.read(packetBuffer, 255);
+      if (len > 0) {
+        packetBuffer[len] = 0;
+      }
+      remoteIP = udp.remoteIP();
+      remotePort = udp.remotePort();
+      parseCommand(packetBuffer, remoteIP, remotePort);
+    }
+  }
   delay(100);//simulate a delay when other tasks are done
 }
 
@@ -556,6 +574,285 @@ result idleHttpConnect(menuOut& o,idleEvent e) {
     o.print("to continue...");
   }
   return proceed;
+}
+
+void parseCommand(char *command, IPAddress remoteIP, uint16_t remotePort) {
+  //TODO: UDP parancsok feldolgozása,és a fájlok fogadása. Fejlesztés alatt
+  //Parancsok: PUTFILE, GETFILE, LISTFILES, GETCONFIG, SETCONFIG, GETROM, SETROM, GETSTATUS, SETSTATUS, GETROMTYPE, SETROMTYPE, GETVOLTAGE, SETVOLTAGE, GETROMCHECK, SETROMCHECK, GETFILESTORAGE, SETFILESTORAGE, GETIP, SETIP, GETPORT, SETPORT
+  //Parancsok és paramétereinek szétválasztása
+  char *pch;
+  std::vector<std::string> params;
+  pch = strtok(command," ");
+  while (pch != NULL) {
+    params.push_back(pch);
+    pch = strtok(NULL," ");
+  }
+  if (strcmp(params[0].c_str(),"PUTFILE") == 0) {
+    Serial.println("Fájl fogadása");
+    if (params.size() == 3) {
+      Serial.println(params[0].c_str());
+      Serial.println(params[1].c_str());
+      Serial.println(params[2].c_str());
+      Serial.println(remoteIP);
+      Serial.println(remotePort);
+    } else {
+      Serial.println("Hibás paraméterek");
+    }
+  } else if (strcmp(params[0].c_str(),"GETFILE") == 0) {
+    Serial.println("Fájl küldése");
+    Serial.println(params[0].c_str());
+    Serial.println(remoteIP);
+    Serial.println(remotePort);
+  } else if (strcmp(params[0].c_str(),"LISTFILES") == 0) {
+    Serial.println("Fájlok listázása");
+    Serial.println(params[0].c_str());
+    Serial.println(remoteIP);
+    Serial.println(remotePort);
+  } else if (strcmp(params[0].c_str(),"GETCONFIG") == 0) {
+    Serial.println("Konfiguráció küldése");
+    Serial.println(params[0].c_str());
+    Serial.println(remoteIP);
+    Serial.println(remotePort);
+  } else if (strcmp(params[0].c_str(),"SETCONFIG") == 0) {
+    Serial.println("Konfiguráció fogadása");
+    Serial.println(params[0].c_str());
+    Serial.println(remoteIP);
+    Serial.println(remotePort);
+  } else if (strcmp(params[0].c_str(),"GETROM") == 0) {
+    Serial.println("Rom küldése");
+    Serial.println(params[0].c_str());
+    Serial.println(remoteIP);
+    Serial.println(remotePort);
+  } else if (strcmp(params[0].c_str(),"SETROM") == 0) {
+    Serial.println("Rom fogadása");
+    Serial.println(params[0].c_str());
+    Serial.println(remoteIP);
+    Serial.println(remotePort);
+  } else if (strcmp(params[0].c_str(),"GETSTATUS") == 0) {
+    Serial.println("Státusz küldése");
+    Serial.println(params[0].c_str());
+    Serial.println(remoteIP);
+    Serial.println(remotePort);
+  } else if (strcmp(params[0].c_str(),"SETSTATUS") == 0) {
+    Serial.println("Státusz fogadása");
+    Serial.println(params[0].c_str());
+    Serial.println(remoteIP);
+    Serial.println(remotePort);
+  } else if (strcmp(params[0].c_str(),"GETROMTYPE") == 0) {
+    Serial.println("Rom típus küldése");
+    Serial.println(params[0].c_str());
+    Serial.println(remoteIP);
+    Serial.println(remotePort);
+  } else if (strcmp(params[0].c_str(),"SETROMTYPE") == 0) {
+    Serial.println("Rom típus fogadása");
+    Serial.println(params[0].c_str());
+    Serial.println(remoteIP);
+    Serial.println(remotePort);
+  } else if (strcmp(params[0].c_str(),"GETVOLTAGE") == 0) {
+    Serial.println("Feszültség küldése");
+    Serial.println(params[0].c_str());
+    Serial.println(remoteIP);
+    Serial.println(remotePort);
+  } else if (strcmp(params[0].c_str(),"SETVOLTAGE") == 0) {
+    Serial.println("Feszültség fogadása");
+    Serial.println(params[0].c_str());
+    Serial.println(remoteIP);
+    Serial.println(remotePort);
+  } else if (strcmp(params[0].c_str(),"GETROMCHECK") == 0) {
+    Serial.println("Rom ellenőrzés küldése");
+    Serial.println(params[0].c_str());
+    Serial.println(remoteIP);
+    Serial.println(remotePort);
+  } else if (strcmp(params[0].c_str(),"SETROMCHECK") == 0) {
+    Serial.println("Rom ellenőrzés fogadása");
+    Serial.println(params[0].c_str());
+    Serial.println(remoteIP);
+    Serial.println(remotePort);
+  } else if (strcmp(params[0].c_str(),"GETFILESTORAGE") == 0) {
+    Serial.println("Fájl tárolás küldése");
+    Serial.println(params[0].c_str());
+    Serial.println(remoteIP);
+    Serial.println(remotePort);
+  } else if (strcmp(params[0].c_str(),"SETFILESTORAGE") == 0) {
+    Serial.println("Fájl tárolás fogadása");
+    Serial.println(params[0].c_str());
+    Serial.println(remoteIP);
+    Serial.println(remotePort);
+  } else if (strcmp(params[0].c_str(),"GETIP") == 0) {
+    Serial.println("IP cím küldése");
+    Serial.println(params[0].c_str());
+    Serial.println(remoteIP);
+    Serial.println(remotePort);
+  } else if (strcmp(params[0].c_str(),"SETIP") == 0) {
+    Serial.println("IP cím fogadása");
+    Serial.println(params[0].c_str());
+    Serial.println(remoteIP);
+    Serial.println(remotePort);
+  } else if (strcmp(params[0].c_str(),"GETPORT") == 0) {
+    Serial.println("Port küldése");
+    Serial.println(params[0].c_str());
+    Serial.println(remoteIP);
+    Serial.println(remotePort);
+  } else if (strcmp(params[0].c_str(),"SETPORT") == 0) {
+    Serial.println("Port fogadása");
+    Serial.println(params[0].c_str());
+    Serial.println(remoteIP);
+    Serial.println(remotePort);
+  } else if (strcmp(params[0].c_str(),"GETSSID") == 0) {
+    Serial.println("SSID küldése");
+    Serial.println(params[0].c_str());
+    Serial.println(remoteIP);
+    Serial.println(remotePort);
+  } else if (strcmp(params[0].c_str(),"SETSSID") == 0) {
+    Serial.println("SSID fogadása");
+    Serial.println(params[0].c_str());
+    Serial.println(remoteIP);
+    Serial.println(remotePort);
+  } else if (strcmp(params[0].c_str(),"GETPASS") == 0) {
+    Serial.println("Jelszó küldése");
+    Serial.println(params[0].c_str());
+    Serial.println(remoteIP);
+    Serial.println(remotePort);
+  } else if (strcmp(params[0].c_str(),"SETPASS") == 0) {
+    Serial.println("Jelszó fogadása");
+    Serial.println(params[0].c_str());
+    Serial.println(remoteIP);
+    Serial.println(remotePort);
+  } else if (strcmp(params[0].c_str(),"GETCONTYPE") == 0) {
+    Serial.println("Kapcsolat típus küldése");
+    Serial.println(params[0].c_str());
+    Serial.println(remoteIP);
+    Serial.println(remotePort);
+  } else if (strcmp(params[0].c_str(),"SETCONTYPE") == 0) {
+    Serial.println("Kapcsolat típus fogadása");
+    Serial.println(params[0].c_str());
+    Serial.println(remoteIP);
+    Serial.println(remotePort);
+  } else if (strcmp(params[0].c_str(),"GETROMSIZE") == 0) {
+    Serial.println("Rom méret küldése");
+    Serial.println(params[0].c_str());
+    Serial.println(remoteIP);
+    Serial.println(remotePort);
+  } else if (strcmp(params[0].c_str(),"SETROMSIZE") == 0) {
+    Serial.println("Rom méret fogadása");
+    Serial.println(params[0].c_str());
+    Serial.println(remoteIP);
+    Serial.println(remotePort);
+  } else if (strcmp(params[0].c_str(),"GETROMNAME") == 0) {
+    Serial.println("Rom név küldése");
+    Serial.println(params[0].c_str());
+    Serial.println(remoteIP);
+    Serial.println(remotePort);
+  } else if (strcmp(params[0].c_str(),"SETROMNAME") == 0) {
+    Serial.println("Rom név fogadása");
+    Serial.println(params[0].c_str());
+    Serial.println(remoteIP);
+    Serial.println(remotePort);
+  } else if (strcmp(params[0].c_str(),"GETROMDATE") == 0) {
+    Serial.println("Rom dátum küldése");
+    Serial.println(params[0].c_str());
+    Serial.println(remoteIP);
+    Serial.println(remotePort);
+  } else if (strcmp(params[0].c_str(),"SETROMDATE") == 0) {
+    Serial.println("Rom dátum fogadása");
+    Serial.println(params[0].c_str());
+    Serial.println(remoteIP);
+    Serial.println(remotePort);
+  } else if (strcmp(params[0].c_str(),"GETROMTIME") == 0) {
+    Serial.println("Rom idő küldése");
+    Serial.println(params[0].c_str());
+    Serial.println(remoteIP);
+    Serial.println(remotePort);
+  } else if (strcmp(params[0].c_str(),"SETROMTIME") == 0) {
+    Serial.println("Rom idő fogadása");
+    Serial.println(params[0].c_str());
+    Serial.println(remoteIP);
+    Serial.println(remotePort);
+  } else if (strcmp(params[0].c_str(),"GETROMCHECKSUM") == 0) {
+    Serial.println("Rom ellenőrző összeg küldése");
+    Serial.println(params[0].c_str());
+    Serial.println(remoteIP);
+    Serial.println(remotePort);
+  } else if (strcmp(params[0].c_str(),"SETROMCHECKSUM") == 0) {
+    Serial.println("Rom ellenőrző összeg fogadása");
+    Serial.println(params[0].c_str());
+    Serial.println(remoteIP);
+    Serial.println(remotePort);
+  } else if (strcmp(params[0].c_str(),"GETROMCHECKSUMTYPE") == 0) {
+    Serial.println("Rom ellenőrző összeg típus küldése");
+    Serial.println(params[0].c_str());
+    Serial.println(remoteIP);
+    Serial.println(remotePort);
+  } else if (strcmp(params[0].c_str(),"SETROMCHECKSUMTYPE") == 0) {
+    Serial.println("Rom ellenőrző összeg típus fogadása");
+    Serial.println(params[0].c_str());
+    Serial.println(remoteIP);
+    Serial.println(remotePort);
+  } else if (strcmp(params[0].c_str(),"GETROMCHECKSUMSIZE") == 0) {
+    Serial.println("Rom ellenőrző összeg méret küldése");
+    Serial.println(params[0].c_str());
+    Serial.println(remoteIP);
+    Serial.println(remotePort);
+  } else if (strcmp(params[0].c_str(),"SETROMCHECKSUMSIZE") == 0) {
+    Serial.println("Rom ellenőrző összeg méret fogadása");
+    Serial.println(params[0].c_str());
+    Serial.println(remoteIP);
+    Serial.println(remotePort);
+  } else if (strcmp(params[0].c_str(),"GETROMCHECKSUMADDRESS") == 0) {
+    Serial.println("Rom ellenőrző összeg cím küldése");
+    Serial.println(params[0].c_str());
+    Serial.println(remoteIP);
+    Serial.println(remotePort);
+  } else if (strcmp(params[0].c_str(),"SETROMCHECKSUMADDRESS") == 0) {
+    Serial.println("Rom ellenőrző összeg cím fogadása");
+    Serial.println(params[0].c_str());
+    Serial.println(remoteIP);
+    Serial.println(remotePort);
+  } else if (strcmp(params[0].c_str(),"GETROMCHECKSUMDATA") == 0) {
+    Serial.println("Rom ellenőrző összeg adat küldése");
+    Serial.println(params[0].c_str());
+    Serial.println(remoteIP);
+    Serial.println(remotePort);
+  } else if (strcmp(params[0].c_str(),"SETROMCHECKSUMDATA") == 0) {
+    Serial.println("Rom ellenőrző összeg adat fogadása");
+    Serial.println(params[0].c_str());
+    Serial.println(remoteIP);
+    Serial.println(remotePort);
+  } else if (strcmp(params[0].c_str(),"GETROMCHECKSUMRESULT") == 0) {
+    Serial.println("Rom ellenőrző összeg eredmény küldése");
+    Serial.println(params[0].c_str());
+    Serial.println(remoteIP);
+    Serial.println(remotePort);
+  } else if (strcmp(params[0].c_str(),"SETROMCHECKSUMRESULT") == 0) {
+    Serial.println("Rom ellenőrző összeg eredmény fogadása");
+    Serial.println(params[0].c_str());
+    Serial.println(remoteIP);
+    Serial.println(remotePort);
+  } else if (strcmp(params[0].c_str(),"GETROMCHECKSUMRESULTTYPE") == 0) {
+    Serial.println("Rom ellenőrző összeg eredmény típus küldése");
+    Serial.println(params[0].c_str());
+    Serial.println(remoteIP);
+    Serial.println(remotePort);
+  } else if (strcmp(params[0].c_str(),"SETROMCHECKSUMRESULTTYPE") == 0) {
+    Serial.println("Rom ellenőrző összeg eredmény típus fogadása");
+    Serial.println(params[0].c_str());
+    Serial.println(remoteIP);
+    Serial.println(remotePort);
+  } else if (strcmp(params[0].c_str(),"GETROMCHECKSUMRESULTSIZE") == 0) {
+    Serial.println("Rom ellenőrző összeg eredmény méret küldése");
+    Serial.println(params[0].c_str());
+    Serial.println(remoteIP);
+    Serial.println(remotePort);
+  } else if (strcmp(params[0].c_str(),"SETROMCHECKSUMRESULTSIZE") == 0) {
+    Serial.println("Rom ellenőrző összeg eredmény méret fogadása");
+    Serial.println(params[0].c_str());
+    Serial.println(remoteIP);
+    Serial.println(remotePort);
+  } else if (strcmp(params[0].c_str(),"GETROMCHECKSUMRESULTADDRESS") == 0) {
+    Serial.println("Rom ellenőrző összeg eredmény cím küldése");
+    Serial.println(params[0].c_str());
+    Serial.println(remoteIP);
+  }
 }
 
 result actHttpConnect(eventMask e,prompt& item) {

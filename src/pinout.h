@@ -6,10 +6,12 @@
 #define ADDR_RST 3
 #define DATA_OUT 4
 #define DATA_RST 5
-#define ENCODER_PINA     13
-#define ENCODER_PINB     14
-#define ENCODER_BTN      0
-#define LEDPIN LED_BUILTIN
+#define ENCODER_PINA     GPIO_NUM_23
+#define ENCODER_PINB     GPIO_NUM_22
+#define ENCODER_BTN      GPIO_NUM_21
+#ifdef ESP8266
+    #define LEDPIN LED_BUILTIN
+#endif
 // ILI9341 TFT pins
 #define TFT_CS   15
 #define TFT_DC   33
