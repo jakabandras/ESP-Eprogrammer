@@ -5,24 +5,21 @@
 #include <ArduinoJson.h>
 #include <SPI.h>
 #include <FS.h>
-#include <SPIFFS.h>
+#include <FFat.h>
 #include <TaskScheduler.h>
 #include <Adafruit_GFX.h>
 #include <ILI9488.h>
 #include <Wifi.h>
 #include <WiFiUdp.h>
-
-
 #include <ClickEncoder.h>
-
-
 #include <menu.h>
 #include <menuIO/adafruitGfxOut.h>
 #include <menuIO/clickEncoderIn.h>
 #include <menuIO/serialOut.h>
 #include <menuIO/serialIn.h>
 #include <menuIO/chainStream.h>
-//#include <plugin/SdFatMenu.h>
+
+#include <plugin/SdFatMenu.h>
 //enable this include if using esp8266
 //#include <menuIO/esp8266Out.h>
 
@@ -41,6 +38,8 @@ struct  Config {
 #define ILI9488_GRAY RGB565(128,128,128)
 #define textScale 1
 #define FORMAT_SPIFFS_IF_FAILED true
+#define FORMAT_FFAT true
+
 
 const colorDef<uint16_t> colors[6] MEMMODE={
   {{(uint16_t)ILI9488_BLACK,(uint16_t)ILI9488_BLACK}, {(uint16_t)ILI9488_BLACK, (uint16_t)ILI9488_BLUE,  (uint16_t)ILI9488_BLUE}},//bgColor
@@ -75,11 +74,13 @@ result actSaveSettings(eventMask e, prompt &item);
 result actLoadSettings(eventMask e, prompt &item);
 result actListFiles(eventMask e, prompt &item);
 result actHttpConnect(eventMask e, prompt &item);
-//result filePick(eventMask event, navNode& nav, prompt &item);
+result filePick(eventMask event, navNode& nav, prompt &item);
+result actRestart(eventMask e, prompt &item);
 void listSPIFFS();
 void setDefConfig();
 void timerIsr();
 void parseCommand(char *command, IPAddress remoteIP, uint16_t remotePort);
+void saveConfig();
 
 int sendAddress(uint16_t address);
 
@@ -103,7 +104,9 @@ ClickEncoder *encoder;
 Config Myconfig;
 Task t1(1000, TASK_FOREVER, &timerIsr);
 WiFiUDP udp;
+//FFat sd;
 
+SDMenuT<CachedFSO<fs::F_Fat,32>> filePickMenu(FFat,"SD Card","/",filePick,enterEvent);
 
 // Menük
 SELECT(selRomType,mnuRomtype,"Rom típus :",doNothing,noEvent,noStyle
@@ -141,7 +144,8 @@ MENU(mnuEprom,"EPROM műveletek",showEvent,anyEvent,noStyle
 
 MENU(mnuFile,"Fájl műveletek",doNothing,noEvent,noStyle
   ,OP("Fájlok listázása",actListFiles,enterEvent)
-  ,OP("Fájl kiválasztása",doNothing,enterEvent)
+  //,OP("Fájl kiválasztása",doNothing,enterEvent)
+  ,SUBMENU(filePickMenu)
   ,OP("Fájl törlése",doNothing,enterEvent)
   ,OP("Fájl átnevezése",doNothing,enterEvent)
   ,OP("Fájl küldése",doNothing,enterEvent)
@@ -154,6 +158,7 @@ SELECT(Myconfig.conType,mnuConType,"Kapcsolat :",actSelConnect,exitEvent,noStyle
   ,VALUE("HTTP",1,doNothing,noEvent)
   ,VALUE("USB/Serial",2,doNothing,noEvent)
 );
+//Kapcsolódások menü
 MENU(mnuConnections,"Csatlakozások",doNothing,noEvent,noStyle
   ,SUBMENU(mnuConType)
   ,EDIT("SSID :",Myconfig.ssid,alphaNumMask,doNothing,noEvent,noStyle)
@@ -162,60 +167,47 @@ MENU(mnuConnections,"Csatlakozások",doNothing,noEvent,noStyle
   ,FIELD(Myconfig.udpport,"Port :","",0,65535,1,1,doNothing,noEvent,noStyle)
   ,EXIT("<Vissza")
 );
-
+//Eprom bináros tárolása menü
 SELECT(Myconfig.fileStorage,mnuStorage,"Romok tárolása :",doNothing,noEvent,noStyle
-  ,VALUE("SPIFFS",0,doNothing,noEvent)
+  ,VALUE("Flash",0,doNothing,noEvent)
   ,VALUE("SD kártya",1,doNothing,noEvent)
 );
-
+//Kijelző beállítása menü
 MENU(mnuScreen,"Kijelző beállítása",doNothing,noEvent,noStyle
   ,OP("Kijelző teszt",doNothing,enterEvent)
   ,OP("Kijelző beállítása",doNothing,enterEvent)
   ,EXIT("<Vissza")
 );
 
+MENU(mnuReceiveSettings,"Beállítások fogadása",doNothing,noEvent,noStyle
+  ,OP("Beállítások fogadása UDP-n",doNothing,enterEvent)
+  ,OP("Beállítások fogadása HTTP-n",doNothing,enterEvent)
+  ,OP("Beállítások fogadása USB-n",doNothing,enterEvent)
+  ,EXIT("<Vissza")
+);
+
+//Beállítások menü
 MENU(mnuMySettings,"Beállítások",doNothing,noEvent,noStyle
   ,SUBMENU(mnuConnections)
   ,SUBMENU(mnuStorage)
   ,SUBMENU(mnuScreen)
-  ,OP("Beállítások mentése",doNothing,enterEvent)
-  ,OP("Beállítások betöltése",doNothing,enterEvent)
+  ,OP("Beállítások mentése",actSaveSettings,enterEvent)
+  ,OP("Beállítások betöltése",actLoadSettings,enterEvent)
+  ,OP("Beállitások alaphelyzetbe állítása",doNothing,enterEvent)
+  ,SUBMENU(mnuReceiveSettings)
+  ,OP("Újraindítás",actRestart,enterEvent)
   ,EXIT("<Vissza")
 );
 
-// TOGGLE(ledCtrl,setLed,"Led: ",doNothing,noEvent,noStyle//,doExit,enterEvent,noStyle
-//   ,VALUE("On",HIGH,doNothing,noEvent)
-//   ,VALUE("Off",LOW,doNothing,noEvent)
-// );
 
-
-// CHOOSE(chooseTest,chooseMenu,"Choose",doNothing,noEvent,noStyle
-//   ,VALUE("First",1,doNothing,noEvent)
-//   ,VALUE("Second",2,doNothing,noEvent)
-//   ,VALUE("Third",3,doNothing,noEvent)
-//   ,VALUE("Last",-1,doNothing,noEvent)
-// );
-
-// uint16_t year=2017;
-// uint16_t month=10;
-// uint16_t day=7;
-
-//define a pad style menu (single line menu)
-//here with a set of fields to enter a date in YYYY/MM/DD format
-//altMENU(menu,birthDate,"Birth",doNothing,noEvent,noStyle,(systemStyles)(_asPad|Menu::_menuData|Menu::_canNav|_parentDraw)
-// PADMENU(birthDate,"Birth",doNothing,noEvent,noStyle
-//   ,FIELD(year,"","/",1900,3000,20,1,doNothing,noEvent,noStyle)
-//   ,FIELD(month,"","/",1,12,1,0,doNothing,noEvent,wrapStyle)
-//   ,FIELD(day,"","",1,31,1,0,doNothing,noEvent,wrapStyle)
-// );
-
+//Főmenü
 MENU(mainMenu,"Main menu",zZz,noEvent,wrapStyle
   ,SUBMENU(mnuEprom)
   ,SUBMENU(mnuFile)
   ,SUBMENU(mnuMySettings)
   ,EXIT("<Back")
 );
-
+//Kimenetek beállítása
 MENU_OUTPUTS(out,MAX_DEPTH
   ,SERIAL_OUT(Serial)
   ,ADAGFX_OUT(tft,colors,6*textScale,9*textScale,{0,0,14,8},{14,0,14,8})
@@ -228,19 +220,27 @@ NAVROOT(nav,mainMenu,MAX_DEPTH,serial,out);
 void setup() {
   Serial.begin(115200);
   while(!Serial);
-
-  if(!SPIFFS.begin(FORMAT_SPIFFS_IF_FAILED)){
-    Serial.println("SPIFFS Mount Failed");
+  if (FORMAT_FFAT) {
+    Serial.println("FFat formázás...");
+    if (!FFat.format()) {
+      Serial.println("FFat formázás sikertelen");
+      return;
+    }
+    Serial.println("FFat formázás sikeres");
+  }
+  if(!FFat.begin()){
+    Serial.println("FFat csatolása sikertelen");
     return;
   }
-  Serial.println("SPIFFS fájlrendszer csatolva");
-  if (!SPIFFS.exists("/config.json")) {
+  Serial.println("FFat fájlrendszer csatolva");
+  if (!FFat.exists("/config.json")) {
     Serial.println("A konfigurációs fájl nem létezik, létrehozás...");
-    File configFile = SPIFFS.open("/config.json", "w");
+    File configFile = FFat.open("/config.json", "w");
     setDefConfig();
     if (!configFile) {
       Serial.println("Nem sikerült megnyitni a konfigurációs fájlt írásra");
     }
+    filePickMenu.begin();
     StaticJsonDocument<512> doc;
     doc["ssid"] = Myconfig.ssid;
     doc["pass"] = Myconfig.pass;
@@ -253,18 +253,18 @@ void setup() {
     configFile.close();
   } else {
     StaticJsonDocument<512> doc;
-    File configFile = SPIFFS.open("/config.json", "r");
+    File configFile = FFat.open("/config.json", "r");
     if (!configFile) {
       Serial.println("Nem sikerült megnyitni a konfigurációs fájlt olvasásra");
     }
     DeserializationError error = deserializeJson(doc, configFile);
-    if (error) {
+    if (!error) { // Ezt majd vissza kell írni
       Serial.println("Nem sikerült beolvasni a konfigurációs fájlt");
       setDefConfig();
+      saveConfig();
     } else {
       strcpy(Myconfig.ssid,doc["ssid"]);
       strcpy(Myconfig.pass,doc["pass"]);
-      //strcpy(Myconfig.ipaddr,doc["ipaddr"]);
       Myconfig.udpport = doc["udpport"];
       Myconfig.conType = doc["conType"];
       Myconfig.fileStorage = doc["fileStorage"];
@@ -273,13 +273,20 @@ void setup() {
   }
   Serial.println("Konfigurációs fájl beolvasva");
   if (Myconfig.conType == 0 || Myconfig.conType == 1) {
+    Serial.println(Myconfig.ssid);
     WiFi.begin(Myconfig.ssid, Myconfig.pass);
     Serial.print("Csatlakozás a ");
     Serial.print(Myconfig.ssid);
     Serial.println(" hálózathoz");
+    int i = 0;
     while (WiFi.status() != WL_CONNECTED) {
       delay(500);
       Serial.print(".");
+      i++;
+      if (i > 20) {
+        Serial.println("Nem sikerült csatlakozni a hálózathoz");
+        break;
+      }
     }
     Serial.println("");
     Serial.println("WiFi kapcsolat létrejött");
@@ -301,6 +308,7 @@ void setup() {
     udp.begin(Myconfig.udpport);
   }
   listSPIFFS();
+  Serial.println(filePickMenu.folderName);
   encoder = new ClickEncoder(ENCODER_PINA, ENCODER_PINB, ENCODER_BTN, 4);
   delay(500);
   SPI.begin();
@@ -346,6 +354,12 @@ result showEvent(eventMask e,navNode& nav,prompt& item) {
   Serial.println(e);
   return proceed;
 }
+
+result actRestart(eventMask e, prompt &item) {
+  ESP.restart();
+  return proceed;
+}
+
 
 
 result alert(menuOut& o,idleEvent e) {
@@ -427,6 +441,7 @@ result actSelConnect(eventMask e,prompt& item) {
 
 result idleSaveSettings(menuOut& o,idleEvent e) {
   if (e==idling) {
+    saveConfig();
     o.setCursor(0,0);
     o.print("saving settings");
     o.setCursor(0,1);
@@ -467,7 +482,7 @@ result idleListFiles(menuOut& o,idleEvent e) {
     o.println("listing files");
     o.println("on SPIFFS:");
     o.println("-------------");
-    File root = SPIFFS.open("/");
+    File root = FFat.open("/");
     if (!root) {
       o.println("Failed to open directory");
       delay(2000);
@@ -530,7 +545,7 @@ int writeParallelEprom(uint16_t address, uint8_t data) {
 
 void listSPIFFS() {
   Serial.println("Listing SPIFFS files");
-  File root = SPIFFS.open("/");
+  File root = FFat.open("/");
   if (!root) {
     Serial.println("Failed to open directory");
     return;
@@ -575,6 +590,22 @@ result idleHttpConnect(menuOut& o,idleEvent e) {
   }
   return proceed;
 }
+
+result filePick(eventMask event, navNode& nav, prompt &item) {
+  // switch(event) {//for now events are filtered only for enter, so we dont need this checking
+  //   case enterCmd:
+      if (nav.root->navFocus==(navTarget*)&filePickMenu) {
+        Serial.println();
+        Serial.print("selected file:");
+        Serial.println(filePickMenu.selectedFile);
+        Serial.print("from folder:");
+        Serial.println(filePickMenu.selectedFolder);
+      }
+  //     break;
+  // }
+  return proceed;
+}
+
 
 void parseCommand(char *command, IPAddress remoteIP, uint16_t remotePort) {
   //TODO: UDP parancsok feldolgozása,és a fájlok fogadása. Fejlesztés alatt
@@ -858,6 +889,22 @@ void parseCommand(char *command, IPAddress remoteIP, uint16_t remotePort) {
 result actHttpConnect(eventMask e,prompt& item) {
   nav.idleOn(idleHttpConnect);
   return proceed;
+}
+
+void saveConfig() {
+  File configFile = FFat.open("/config.json", "w");
+  if (!configFile) {
+    Serial.println("Nem sikerült megnyitni a konfigurációs fájlt írásra");
+  }
+  StaticJsonDocument<512> doc;
+  doc["ssid"] = Myconfig.ssid;
+  doc["pass"] = Myconfig.pass;
+  doc["udpport"] = Myconfig.udpport;
+  doc["conType"] = Myconfig.conType;
+  doc["fileStorage"] = Myconfig.fileStorage;
+  doc["romCheck"] = Myconfig.romCheck;
+  serializeJson(doc, configFile);
+  configFile.close();
 }
 
 
