@@ -8,16 +8,20 @@
 #include <FFat.h>
 #include <TaskScheduler.h>
 #include <Adafruit_GFX.h>
-#include <ILI9488.h>
+//#include <U8g2_for_Adafruit_GFX.h>
+//#include <ILI9488.h>
+//#include <Fonts/FreeSansBold9pt7b.h>
 #include <Wifi.h>
 #include <WiFiUdp.h>
 #include <ClickEncoder.h>
 #include <menu.h>
 #include <menuIO/adafruitGfxOut.h>
+#include <menuIO/TFT_eSPIOut.h>
 #include <menuIO/clickEncoderIn.h>
 #include <menuIO/serialOut.h>
 #include <menuIO/serialIn.h>
 #include <menuIO/chainStream.h>
+#include <Fonts/Arial14.h>
 
 #include <plugin/SdFatMenu.h>
 //enable this include if using esp8266
@@ -35,19 +39,19 @@ struct  Config {
 
 
 #define MAX_DEPTH 5
-#define ILI9488_GRAY RGB565(128,128,128)
-#define textScale 1
+#define TFT_GRAY RGB565(128,128,128)
+#define textScale 1.5
 #define FORMAT_SPIFFS_IF_FAILED true
 #define FORMAT_FFAT true
 
 
 const colorDef<uint16_t> colors[6] MEMMODE={
-  {{(uint16_t)ILI9488_BLACK,(uint16_t)ILI9488_BLACK}, {(uint16_t)ILI9488_BLACK, (uint16_t)ILI9488_BLUE,  (uint16_t)ILI9488_BLUE}},//bgColor
-  {{(uint16_t)ILI9488_GRAY, (uint16_t)ILI9488_GRAY},  {(uint16_t)ILI9488_WHITE, (uint16_t)ILI9488_WHITE, (uint16_t)ILI9488_WHITE}},//fgColor
-  {{(uint16_t)ILI9488_WHITE,(uint16_t)ILI9488_BLACK}, {(uint16_t)ILI9488_YELLOW,(uint16_t)ILI9488_YELLOW,(uint16_t)ILI9488_RED}},//valColor
-  {{(uint16_t)ILI9488_WHITE,(uint16_t)ILI9488_BLACK}, {(uint16_t)ILI9488_WHITE, (uint16_t)ILI9488_YELLOW,(uint16_t)ILI9488_YELLOW}},//unitColor
-  {{(uint16_t)ILI9488_WHITE,(uint16_t)ILI9488_GRAY},  {(uint16_t)ILI9488_BLACK, (uint16_t)ILI9488_BLUE,  (uint16_t)ILI9488_WHITE}},//cursorColor
-  {{(uint16_t)ILI9488_WHITE,(uint16_t)ILI9488_YELLOW},{(uint16_t)ILI9488_BLUE,  (uint16_t)ILI9488_RED,   (uint16_t)ILI9488_RED}},//titleColor
+  {{(uint16_t)TFT_BLACK,(uint16_t)TFT_BLACK}, {(uint16_t)TFT_BLACK, (uint16_t)TFT_BLUE,  (uint16_t)TFT_BLUE}},//bgColor
+  {{(uint16_t)TFT_GRAY, (uint16_t)TFT_GRAY},  {(uint16_t)TFT_WHITE, (uint16_t)TFT_WHITE, (uint16_t)TFT_WHITE}},//fgColor
+  {{(uint16_t)TFT_WHITE,(uint16_t)TFT_BLACK}, {(uint16_t)TFT_YELLOW,(uint16_t)TFT_YELLOW,(uint16_t)TFT_RED}},//valColor
+  {{(uint16_t)TFT_WHITE,(uint16_t)TFT_BLACK}, {(uint16_t)TFT_WHITE, (uint16_t)TFT_YELLOW,(uint16_t)TFT_YELLOW}},//unitColor
+  {{(uint16_t)TFT_WHITE,(uint16_t)TFT_GRAY},  {(uint16_t)TFT_BLACK, (uint16_t)TFT_BLUE,  (uint16_t)TFT_WHITE}},//cursorColor
+  {{(uint16_t)TFT_WHITE,(uint16_t)TFT_YELLOW},{(uint16_t)TFT_BLUE,  (uint16_t)TFT_RED,   (uint16_t)TFT_RED}},//titleColor
 };
 
 
@@ -64,29 +68,34 @@ result showEvent(eventMask e,navNode& nav,prompt& item);
 result doAlert(eventMask e, prompt &item);
 result alert(menuOut& o,idleEvent e);
 result idle(menuOut& o,idleEvent e);
-result actRomRead(eventMask e, prompt &item);
-result actRomWrite(eventMask e, prompt &item);
-result actRomErase(eventMask e, prompt &item);
-result actRomEraseFast(eventMask e, prompt &item);
-result actRomCheck(eventMask e, prompt &item);
-result actSelConnect(eventMask e, prompt &item);
-result actSaveSettings(eventMask e, prompt &item);
-result actLoadSettings(eventMask e, prompt &item);
-result actListFiles(eventMask e, prompt &item);
+result actRomRead(eventMask e, prompt& item);
+result actRomWrite(eventMask e, prompt& item);
+result actRomErase(eventMask e, prompt& item);
+result actRomEraseFast(eventMask e, prompt& item);
+result actRomCheck(eventMask e, prompt& item);
+result actSelConnect(eventMask e, prompt& item);
+result actSaveSettings(eventMask e, prompt& item);
+result actLoadSettings(eventMask e, prompt& item);
+result actListFiles(eventMask e, prompt& item);
 result actHttpConnect(eventMask e, prompt &item);
 result filePick(eventMask event, navNode& nav, prompt &item);
-result actRestart(eventMask e, prompt &item);
+result actRestart(eventMask e, prompt& item);
+result actFontChange(eventMask e,navNode& nav ,prompt& item);
 void listSPIFFS();
 void setDefConfig();
 void timerIsr();
 void parseCommand(char *command, IPAddress remoteIP, uint16_t remotePort);
 void saveConfig();
+void findFonts();
 
 int sendAddress(uint16_t address);
 
 
 // Globális változók
-ILI9488 tft = ILI9488(TFT_CS, TFT_DC, TFT_MOSI, TFT_CLK, TFT_RST, TFT_MISO);
+//ILI9488 tft = ILI9488(TFT_CS, TFT_DC, TFT_MOSI, TFT_SCLK, TFT_RST, TFT_MISO);
+TFT_eSPI tft2 = TFT_eSPI();
+
+//U8G2_FOR_ADAFRUIT_GFX u8g2Fonts;
 float test=55;
 int ledCtrl=LOW;
 int selTest=0;
@@ -99,12 +108,24 @@ char buf1[]="0x11";
 char name[]="                                                  ";
 char ipaddr[47] = "                                              ";
 int fileStorage = 0;
-ClickEncoder *encoder;
+//ClickEncoder *encoder;
+//ClickEncoderStream encStream(*encoder,1);
 //ESP8266Timer ITimer;
 Config Myconfig;
-Task t1(1000, TASK_FOREVER, &timerIsr);
+//Task t1(1000, TASK_FOREVER, &timerIsr);
 WiFiUDP udp;
 //FFat sd;
+String fonts[30] = {
+  "Arial14"
+  ,"Arial-BoldMT-14"
+  ,"Arial-Black-14"
+  ,"Calibri-Bold-14"
+  ,"Georgia-Bold-14"
+  ,"Impact-14"
+  ,"InkFree-14"
+  ,"LeelawadeeUI-14"
+  ,"MVBoli-14"
+};
 
 SDMenuT<CachedFSO<fs::F_Fat,32>> filePickMenu(FFat,"SD Card","/",filePick,enterEvent);
 
@@ -126,6 +147,19 @@ TOGGLE(Myconfig.romCheck,mnuRomCheck,"Ellenőrzés írás után :",doNothing,noE
   ,VALUE("BE",1,doNothing,noEvent)
   ,VALUE("KI",0,doNothing,noEvent)
 );
+int selFont=0;
+SELECT(selFont,mnuFont,"Betűtípus :",actFontChange,exitEvent,noStyle
+  ,VALUE("Arial14",0,doNothing,noEvent)
+  ,VALUE("Arial-BoldMT-14",1,doNothing,noEvent)
+  ,VALUE("Arial-Black-14",2,doNothing,noEvent)
+  ,VALUE("Calibri-Bold-14",3,doNothing,noEvent)
+  ,VALUE("Georgia-Bold-14",4,doNothing,noEvent)
+  ,VALUE("Impact-14",5,doNothing,noEvent)
+  ,VALUE("InkFree-14",6,doNothing,noEvent)
+  ,VALUE("LeelawadeeUI-14",7,doNothing,noEvent)
+  ,VALUE("MVBoli-14",8,doNothing,noEvent)
+);
+
 
 MENU(mnuEprom,"EPROM műveletek",showEvent,anyEvent,noStyle
   ,SUBMENU(mnuRomtype)
@@ -174,6 +208,7 @@ SELECT(Myconfig.fileStorage,mnuStorage,"Romok tárolása :",doNothing,noEvent,no
 );
 //Kijelző beállítása menü
 MENU(mnuScreen,"Kijelző beállítása",doNothing,noEvent,noStyle
+  ,SUBMENU(mnuFont)
   ,OP("Kijelző teszt",doNothing,enterEvent)
   ,OP("Kijelző beállítása",doNothing,enterEvent)
   ,EXIT("<Vissza")
@@ -201,25 +236,41 @@ MENU(mnuMySettings,"Beállítások",doNothing,noEvent,noStyle
 
 
 //Főmenü
-MENU(mainMenu,"Main menu",zZz,noEvent,wrapStyle
+MENU(mainMenu,"Főmenü",zZz,noEvent,wrapStyle
   ,SUBMENU(mnuEprom)
   ,SUBMENU(mnuFile)
   ,SUBMENU(mnuMySettings)
   ,EXIT("<Back")
 );
 //Kimenetek beállítása
-MENU_OUTPUTS(out,MAX_DEPTH
-  ,SERIAL_OUT(Serial)
-  ,ADAGFX_OUT(tft,colors,6*textScale,9*textScale,{0,0,14,8},{14,0,14,8})
-);
+// MENU_OUTPUTS(out,MAX_DEPTH
+//   ,ADAGFX_OUT(tft2,colors,6*textScale,9*textScale,{0,0,14,8},{14,0,14,8})
+//   ,SERIAL_OUT(Serial)
+// );
+
+#define GFX_WIDTH 480
+#define GFX_HEIGHT 320
+#define fontW 8
+#define fontH 16
+
+//define serial output device
+idx_t serialTops[MAX_DEPTH]={0};
+serialOut outSerial(Serial,serialTops);
+
+
+const panel panels[] MEMMODE = {{0, 0, GFX_WIDTH / fontW, GFX_HEIGHT / fontH}};
+navNode* nodes[sizeof(panels) / sizeof(panel)]; //navNodes to store navigation status
+panelsList pList(panels, nodes, 1); //a list of panels and nodes
+idx_t eSpiTops[MAX_DEPTH]={0};
+TFT_eSPIOut eSpiOut(tft2,colors,eSpiTops,pList,fontW,fontH+1);
+menuOut* constMEM outputs[] MEMMODE={&outSerial,&eSpiOut};//list of output devices
+outputsList out(outputs,sizeof(outputs)/sizeof(menuOut*));//outputs list controller
 
 serialIn serial(Serial);
-NAVROOT(nav,mainMenu,MAX_DEPTH,serial,out);
+MENU_INPUTS(in,&serial);
+NAVROOT(nav,mainMenu,MAX_DEPTH,in,out);
 
-
-void setup() {
-  Serial.begin(115200);
-  while(!Serial);
+void formatFFat() {
   if (FORMAT_FFAT) {
     Serial.println("FFat formázás...");
     if (!FFat.format()) {
@@ -228,17 +279,39 @@ void setup() {
     }
     Serial.println("FFat formázás sikeres");
   }
-  if(!FFat.begin()){
-    Serial.println("FFat csatolása sikertelen");
-    return;
+}
+
+void linePrint(const char *text) {
+  Serial.println(text);
+}
+
+void linePrint(const String text) {
+  Serial.println(text);
+  //u8g2Fonts.println(text);
+}
+
+
+void setup() {
+  for (int i = 0; i < 30; i++) {
+    fonts[i] = "";
   }
-  Serial.println("FFat fájlrendszer csatolva");
+  Serial.begin(115200);
+  while(!Serial);
+  linePrint("ESP32 Eprom programmer");
+
+  if(!FFat.begin()){
+    linePrint("FFat csatolása sikertelen");
+    formatFFat();
+    FFat.begin();
+  }
+  linePrint("FFat fájlrendszer csatolva");
+  findFonts();
   if (!FFat.exists("/config.json")) {
-    Serial.println("A konfigurációs fájl nem létezik, létrehozás...");
+    linePrint("A konfigurációs fájl nem létezik, létrehozás...");
     File configFile = FFat.open("/config.json", "w");
     setDefConfig();
     if (!configFile) {
-      Serial.println("Nem sikerült megnyitni a konfigurációs fájlt írásra");
+      linePrint("Nem sikerült megnyitni a konfigurációs fájlt írásra");
     }
     filePickMenu.begin();
     StaticJsonDocument<512> doc;
@@ -255,11 +328,11 @@ void setup() {
     StaticJsonDocument<512> doc;
     File configFile = FFat.open("/config.json", "r");
     if (!configFile) {
-      Serial.println("Nem sikerült megnyitni a konfigurációs fájlt olvasásra");
+      linePrint("Nem sikerült megnyitni a konfigurációs fájlt olvasásra");
     }
     DeserializationError error = deserializeJson(doc, configFile);
     if (!error) { // Ezt majd vissza kell írni
-      Serial.println("Nem sikerült beolvasni a konfigurációs fájlt");
+      linePrint("Nem sikerült beolvasni a konfigurációs fájlt");
       setDefConfig();
       saveConfig();
     } else {
@@ -271,7 +344,7 @@ void setup() {
       Myconfig.romCheck = doc["romCheck"];
     }
   }
-  Serial.println("Konfigurációs fájl beolvasva");
+  linePrint("Konfigurációs fájl beolvasva");
   if (Myconfig.conType == 0 || Myconfig.conType == 1) {
     Serial.println(Myconfig.ssid);
     WiFi.begin(Myconfig.ssid, Myconfig.pass);
@@ -307,19 +380,21 @@ void setup() {
   if (Myconfig.conType == 0) {
     udp.begin(Myconfig.udpport);
   }
-  listSPIFFS();
-  Serial.println(filePickMenu.folderName);
-  encoder = new ClickEncoder(ENCODER_PINA, ENCODER_PINB, ENCODER_BTN, 4);
+  //encoder = new ClickEncoder(ENCODER_PINA, ENCODER_PINB, ENCODER_BTN, 4);
+
   delay(500);
-  SPI.begin();
-  tft.begin();
-  tft.setRotation(1);
-  tft.fillScreen(ILI9488_BLACK);
-  tft.setTextColor(ILI9488_RED, ILI9488_BLACK);
-  tft.setTextSize(textScale);
-  tft.setCursor(0, 0);
-  tft.println("ESP32 Eprom programmer");
-  Serial.println("ESP32 Eprom programmer");Serial.flush();
+  tft2.begin();
+  tft2.loadFont("Arial14",FFat);
+  tft2.setTextSize(textScale);
+  //tft2.setFreeFont(&Arial14);
+  
+  tft2.setRotation(1);
+  tft2.fillScreen(TFT_BLACK);
+  tft2.setTextColor(TFT_RED, TFT_BLACK);
+  tft2.println("ESP32 Eprom programmer");
+  tft2.setTextSize(textScale);
+
+  tft2.setCursor(0, 0);
   nav.timeOut=70;
   nav.idleTask=idle;//point a function to be used when menu is suspended
 }
@@ -329,7 +404,7 @@ void loop() {
   uint16_t remotePort;
   nav.poll();
   #ifdef ESP8266
-  digitalWrite(LEDPIN, ledCtrl);
+  //digitalWrite(LEDPIN, ledCtrl);
   #endif
   if (Myconfig.conType == 0) {
     int packetSize = udp.parsePacket();
@@ -355,7 +430,7 @@ result showEvent(eventMask e,navNode& nav,prompt& item) {
   return proceed;
 }
 
-result actRestart(eventMask e, prompt &item) {
+result actRestart(eventMask e, prompt& item) {
   ESP.restart();
   return proceed;
 }
@@ -910,5 +985,59 @@ void saveConfig() {
 
 // Interrupt rutin
 void timerIsr() {
-  encoder->service();
+  //encoder->service();
+}
+
+void findFonts() {
+  File dr = FFat.open("/");
+  int i = 0;
+  if (!dr) {
+      linePrint("Nem található betűtípus");
+  } else {
+    while (true) {
+      File entry =  dr.openNextFile();
+      if (!entry) {
+        break;
+      }
+      String name = entry.name();
+      if (name.endsWith(".vlw")) {
+        name.remove(name.length() - 4);
+        fonts[i++] = name;
+        linePrint(name);
+      }
+      
+      entry.close();
+    }
+    // i--;
+    // prompt* fontList[i];
+    // for (int j = 0; j < i-1; j++) {
+    //   fontList[j] = new menuValue<int>(fonts[j].c_str(),j);
+    // }
+    // //mnuFont = new menu("Betűtípus",fontList,i);
+    // //choose<int>& durMenu =*new choose<int>("Duration",duration,sizeof(durData)/sizeof(prompt*),durData);
+    // mnuFont = *new Menu::select<int>("Betűtípus : ",selFont
+    // ,sizeof(fontList)/sizeof(prompt*),fontList,(Menu::callback)actFontChange,anyEvent);
+    dr.close();
+  }
+}
+
+result actFontChange(eventMask e,navNode& nav ,prompt& item) {
+  if (e==exitEvent) {
+    Serial.println("");
+    Serial.print("selected font: " + fonts[selFont]);
+    //delay(5000);
+    //item.
+    tft2.unloadFont();
+    tft2.loadFont(fonts[selFont],FFat);
+    tft2.setTextSize(textScale);
+    tft2.fillScreen(TFT_BLACK);
+    tft2.setTextColor(TFT_RED, TFT_BLACK);
+    tft2.println("ESP32 Eprom programmer");
+    tft2.setTextSize(textScale);
+    tft2.setCursor(0, 0);
+    nav.reset();
+    // nav.timeOut=70;
+    // nav.idleTask=idle;//point a function to be used when menu is suspended
+  }
+  return proceed;
 }
