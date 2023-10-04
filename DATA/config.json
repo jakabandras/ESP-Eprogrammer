@@ -1,0 +1,11 @@
+{
+    "ssid":"DIGI_7fe918"
+    ,"pass":"ddcc8016",
+    "udpport":1234,
+    "conType":0,
+    "fileStorage":0,
+    "romCheck":0,
+    "scrFont":0,
+    "scrTajol":1,
+    "scale":1.5
+}

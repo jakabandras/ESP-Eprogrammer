@@ -8,24 +8,20 @@
 #include <FFat.h>
 #include <TaskScheduler.h>
 #include <Adafruit_GFX.h>
-//#include <U8g2_for_Adafruit_GFX.h>
-//#include <ILI9488.h>
-//#include <Fonts/FreeSansBold9pt7b.h>
 #include <Wifi.h>
 #include <WiFiUdp.h>
 #include <ClickEncoder.h>
 #include <menu.h>
 #include <menuIO/adafruitGfxOut.h>
 #include <menuIO/TFT_eSPIOut.h>
-#include <menuIO/clickEncoderIn.h>
+#include <menuIO/analogAxisIn.h>
+#include <menuIO/keyIn.h>
+//#include <menuIO/clickEncoderIn.h>
 #include <menuIO/serialOut.h>
 #include <menuIO/serialIn.h>
 #include <menuIO/chainStream.h>
-#include <Fonts/Arial14.h>
-
 #include <plugin/SdFatMenu.h>
-//enable this include if using esp8266
-//#include <menuIO/esp8266Out.h>
+#include <TFT_eFEX.h>              // Include the extension graphics functions library
 
 struct  Config {
   char ssid[20];
@@ -35,6 +31,9 @@ struct  Config {
   int conType;
   int fileStorage;
   int romCheck;
+  int scrFont;
+  int scrTajol=0;
+  float scale = 1.5;
 };
 
 
@@ -43,6 +42,12 @@ struct  Config {
 #define textScale 1.5
 #define FORMAT_SPIFFS_IF_FAILED true
 #define FORMAT_FFAT true
+#define JOY_X 36
+#define JOY_Y 39
+#define JOY_BTN 12
+
+
+
 
 
 const colorDef<uint16_t> colors[6] MEMMODE={
@@ -81,21 +86,28 @@ result actHttpConnect(eventMask e, prompt &item);
 result filePick(eventMask event, navNode& nav, prompt &item);
 result actRestart(eventMask e, prompt& item);
 result actFontChange(eventMask e,navNode& nav ,prompt& item);
+result actScrTajol(eventMask e,navNode& nav ,prompt& item);
+result actChangeScale(eventMask e,navNode& nav ,prompt& item);
+result actListSettings(eventMask e, navNode& nav, prompt& item);
+result actScreenTest(eventMask e, navNode& nav, prompt& item);
 void listSPIFFS();
 void setDefConfig();
 void timerIsr();
 void parseCommand(char *command, IPAddress remoteIP, uint16_t remotePort);
 void saveConfig();
-void findFonts();
-
 int sendAddress(uint16_t address);
+void getFile(String fname, byte tfile[]);
+analogAxis<JOY_Y,10,false> ay;
+
+#define joyBtn 12
+
+keyMap btnsMap[]={{-joyBtn,defaultNavCodes[enterCmd].ch}};//negative pin numbers use internal pull-up, this is on when low
+keyIn<1> btns(btnsMap);// 1 is the number of keys
 
 
 // Globális változók
-//ILI9488 tft = ILI9488(TFT_CS, TFT_DC, TFT_MOSI, TFT_SCLK, TFT_RST, TFT_MISO);
-TFT_eSPI tft2 = TFT_eSPI();
-
-//U8G2_FOR_ADAFRUIT_GFX u8g2Fonts;
+TFT_eSPI tft = TFT_eSPI();
+TFT_eFEX  fex = TFT_eFEX(&tft);    // Create TFT_eFX object "efx" with pointer to "tft" object
 float test=55;
 int ledCtrl=LOW;
 int selTest=0;
@@ -108,13 +120,8 @@ char buf1[]="0x11";
 char name[]="                                                  ";
 char ipaddr[47] = "                                              ";
 int fileStorage = 0;
-//ClickEncoder *encoder;
-//ClickEncoderStream encStream(*encoder,1);
-//ESP8266Timer ITimer;
 Config Myconfig;
-//Task t1(1000, TASK_FOREVER, &timerIsr);
 WiFiUDP udp;
-//FFat sd;
 String fonts[30] = {
   "Arial14"
   ,"Arial-BoldMT-14"
@@ -127,7 +134,9 @@ String fonts[30] = {
   ,"MVBoli-14"
 };
 
-SDMenuT<CachedFSO<fs::F_Fat,32>> filePickMenu(FFat,"SD Card","/",filePick,enterEvent);
+
+
+SDMenuT<CachedFSO<fs::F_Fat,32>> filePickMenu(FFat,"FFAT partíció","/",filePick,enterEvent);
 
 // Menük
 SELECT(selRomType,mnuRomtype,"Rom típus :",doNothing,noEvent,noStyle
@@ -161,7 +170,7 @@ SELECT(selFont,mnuFont,"Betűtípus :",actFontChange,exitEvent,noStyle
 );
 
 
-MENU(mnuEprom,"EPROM műveletek",showEvent,anyEvent,noStyle
+MENU(mnuEprom,"EPROM műveletek",doNothing,noEvent,noStyle
   ,SUBMENU(mnuRomtype)
   ,SUBMENU(mnuVoltage)
   ,SUBMENU(mnuRomCheck)
@@ -178,7 +187,6 @@ MENU(mnuEprom,"EPROM műveletek",showEvent,anyEvent,noStyle
 
 MENU(mnuFile,"Fájl műveletek",doNothing,noEvent,noStyle
   ,OP("Fájlok listázása",actListFiles,enterEvent)
-  //,OP("Fájl kiválasztása",doNothing,enterEvent)
   ,SUBMENU(filePickMenu)
   ,OP("Fájl törlése",doNothing,enterEvent)
   ,OP("Fájl átnevezése",doNothing,enterEvent)
@@ -206,10 +214,20 @@ SELECT(Myconfig.fileStorage,mnuStorage,"Romok tárolása :",doNothing,noEvent,no
   ,VALUE("Flash",0,doNothing,noEvent)
   ,VALUE("SD kártya",1,doNothing,noEvent)
 );
+
+SELECT(Myconfig.scrTajol,mnuScrTajol,"Kijelző tájolása :",actScrTajol,exitEvent,noStyle
+  ,VALUE("Függőleges",0,doNothing,noEvent)
+  ,VALUE("Vízszintes",1,doNothing,noEvent)
+  ,VALUE("Függőleges tükrözve",2,doNothing,noEvent)
+  ,VALUE("Vízszintes tükrözve",3,doNothing,noEvent)
+);
+
 //Kijelző beállítása menü
 MENU(mnuScreen,"Kijelző beállítása",doNothing,noEvent,noStyle
   ,SUBMENU(mnuFont)
-  ,OP("Kijelző teszt",doNothing,enterEvent)
+  ,SUBMENU(mnuScrTajol)
+  ,FIELD(Myconfig.scale,"Kijelző mérete :","",1,3,0.1,1,actChangeScale,exitEvent,noStyle)
+  ,OP("Kijelző teszt",actScreenTest,enterEvent)
   ,OP("Kijelző beállítása",doNothing,enterEvent)
   ,EXIT("<Vissza")
 );
@@ -218,6 +236,7 @@ MENU(mnuReceiveSettings,"Beállítások fogadása",doNothing,noEvent,noStyle
   ,OP("Beállítások fogadása UDP-n",doNothing,enterEvent)
   ,OP("Beállítások fogadása HTTP-n",doNothing,enterEvent)
   ,OP("Beállítások fogadása USB-n",doNothing,enterEvent)
+  ,OP("Beállítások küldése USB-n", actListSettings, enterEvent)
   ,EXIT("<Vissza")
 );
 
@@ -242,11 +261,6 @@ MENU(mainMenu,"Főmenü",zZz,noEvent,wrapStyle
   ,SUBMENU(mnuMySettings)
   ,EXIT("<Back")
 );
-//Kimenetek beállítása
-// MENU_OUTPUTS(out,MAX_DEPTH
-//   ,ADAGFX_OUT(tft2,colors,6*textScale,9*textScale,{0,0,14,8},{14,0,14,8})
-//   ,SERIAL_OUT(Serial)
-// );
 
 #define GFX_WIDTH 480
 #define GFX_HEIGHT 320
@@ -262,12 +276,12 @@ const panel panels[] MEMMODE = {{0, 0, GFX_WIDTH / fontW, GFX_HEIGHT / fontH}};
 navNode* nodes[sizeof(panels) / sizeof(panel)]; //navNodes to store navigation status
 panelsList pList(panels, nodes, 1); //a list of panels and nodes
 idx_t eSpiTops[MAX_DEPTH]={0};
-TFT_eSPIOut eSpiOut(tft2,colors,eSpiTops,pList,fontW,fontH+1);
+TFT_eSPIOut eSpiOut(tft,colors,eSpiTops,pList,fontW,fontH+1);
 menuOut* constMEM outputs[] MEMMODE={&outSerial,&eSpiOut};//list of output devices
 outputsList out(outputs,sizeof(outputs)/sizeof(menuOut*));//outputs list controller
 
 serialIn serial(Serial);
-MENU_INPUTS(in,&serial);
+MENU_INPUTS(in,&ay,&btns,&serial);
 NAVROOT(nav,mainMenu,MAX_DEPTH,in,out);
 
 void formatFFat() {
@@ -287,25 +301,28 @@ void linePrint(const char *text) {
 
 void linePrint(const String text) {
   Serial.println(text);
-  //u8g2Fonts.println(text);
 }
 
 
 void setup() {
-  for (int i = 0; i < 30; i++) {
-    fonts[i] = "";
-  }
   Serial.begin(115200);
   while(!Serial);
   linePrint("ESP32 Eprom programmer");
-
+  Serial.println("Joystick kalibrálása");
+  uint32_t iKalVal = 0;
+  for (int i = 0; i < 50; i++) {
+    Serial.print(".");
+    iKalVal += analogRead(JOY_Y);
+    delay(100);
+  }
+  ay.setCalibration(iKalVal / 50);
+  Serial.println("Kész");
   if(!FFat.begin()){
     linePrint("FFat csatolása sikertelen");
     formatFFat();
     FFat.begin();
   }
   linePrint("FFat fájlrendszer csatolva");
-  findFonts();
   if (!FFat.exists("/config.json")) {
     linePrint("A konfigurációs fájl nem létezik, létrehozás...");
     File configFile = FFat.open("/config.json", "w");
@@ -317,11 +334,12 @@ void setup() {
     StaticJsonDocument<512> doc;
     doc["ssid"] = Myconfig.ssid;
     doc["pass"] = Myconfig.pass;
-    //doc["ipaddr"] = Myconfig.ipaddr;
     doc["udpport"] = Myconfig.udpport;
     doc["conType"] = Myconfig.conType;
     doc["fileStorage"] = Myconfig.fileStorage;
     doc["romCheck"] = Myconfig.romCheck;
+    doc["scrFont"] = Myconfig.scrFont;
+    doc["scrTajol"] = Myconfig.scrTajol;
     serializeJson(doc, configFile);
     configFile.close();
   } else {
@@ -342,6 +360,9 @@ void setup() {
       Myconfig.conType = doc["conType"];
       Myconfig.fileStorage = doc["fileStorage"];
       Myconfig.romCheck = doc["romCheck"];
+      Myconfig.scrFont = doc["scrFont"];
+      selFont = Myconfig.scrFont;
+      Myconfig.scrTajol = doc["scrTajol"];
     }
   }
   linePrint("Konfigurációs fájl beolvasva");
@@ -383,19 +404,22 @@ void setup() {
   //encoder = new ClickEncoder(ENCODER_PINA, ENCODER_PINB, ENCODER_BTN, 4);
 
   delay(500);
-  tft2.begin();
-  tft2.loadFont("Arial14",FFat);
-  tft2.setTextSize(textScale);
-  //tft2.setFreeFont(&Arial14);
+  tft.begin();
+  //fex.drawJpg(Betti1, sizeof(Betti1), 0, 0);
+  fex.drawJpgFile(FFat, "/Betti2.jpg", 0, 0);
   
-  tft2.setRotation(1);
-  tft2.fillScreen(TFT_BLACK);
-  tft2.setTextColor(TFT_RED, TFT_BLACK);
-  tft2.println("ESP32 Eprom programmer");
-  tft2.setTextSize(textScale);
+  delay(5000);
+  tft.loadFont(fonts[selFont],FFat);
+  tft.setTextSize(textScale);
+  
+  tft.setRotation(Myconfig.scrTajol);
+  tft.fillScreen(TFT_BLACK);
+  tft.setTextColor(TFT_RED, TFT_BLACK);
+  tft.println("ESP32 Eprom programmer");
+  tft.setTextSize(textScale);
 
-  tft2.setCursor(0, 0);
-  nav.timeOut=70;
+  tft.setCursor(0, 0);
+  nav.timeOut=7000;
   nav.idleTask=idle;//point a function to be used when menu is suspended
 }
 
@@ -421,9 +445,9 @@ void loop() {
   }
   delay(100);//simulate a delay when other tasks are done
 }
-
-// Függvények és eljárások
-
+//******************************
+//*Függvények és eljárások     *
+//******************************
 result showEvent(eventMask e,navNode& nav,prompt& item) {
   Serial.print("event: ");
   Serial.println(e);
@@ -434,8 +458,6 @@ result actRestart(eventMask e, prompt& item) {
   ESP.restart();
   return proceed;
 }
-
-
 
 result alert(menuOut& o,idleEvent e) {
   if (e==idling) {
@@ -646,12 +668,17 @@ void listSPIFFS() {
 
 void setDefConfig() {
   strcpy(Myconfig.ssid,"DIGI_7fe918");
+  //strcpy(Myconfig.ssid,"Wifi_neve");
   strcpy(Myconfig.pass,"ddcc8016");
+  //strcpy(Myconfig.pass,"jelszó");
   strcpy(Myconfig.ipaddr,"");
   Myconfig.udpport = 1234;
   Myconfig.conType = 0;
   Myconfig.fileStorage = 0;
   Myconfig.romCheck = 0;
+  Myconfig.scrFont = 0;
+  Myconfig.scrTajol = 1;
+  Myconfig.scale = 1.5;
 }
 
 //TODO: HTTP kapcsolat megírása
@@ -684,11 +711,13 @@ result filePick(eventMask event, navNode& nav, prompt &item) {
 
 void parseCommand(char *command, IPAddress remoteIP, uint16_t remotePort) {
   //TODO: UDP parancsok feldolgozása,és a fájlok fogadása. Fejlesztés alatt
-  //Parancsok: PUTFILE, GETFILE, LISTFILES, GETCONFIG, SETCONFIG, GETROM, SETROM, GETSTATUS, SETSTATUS, GETROMTYPE, SETROMTYPE, GETVOLTAGE, SETVOLTAGE, GETROMCHECK, SETROMCHECK, GETFILESTORAGE, SETFILESTORAGE, GETIP, SETIP, GETPORT, SETPORT
+  //Parancsok: PUTFILE, GETFILE, LISTFILES, GETCONFIG, SETCONFIG, GETROM, SETROM, 
+  //GETSTATUS, SETSTATUS, GETROMTYPE, SETROMTYPE, GETVOLTAGE, SETVOLTAGE, GETROMCHECK, 
+  //SETROMCHECK, GETFILESTORAGE, SETFILESTORAGE, GETIP, SETIP, GETPORT, SETPORT
   //Parancsok és paramétereinek szétválasztása
   char *pch;
   std::vector<std::string> params;
-  pch = strtok(command," ");
+  pch = strtok(command,"|");
   while (pch != NULL) {
     params.push_back(pch);
     pch = strtok(NULL," ");
@@ -978,6 +1007,9 @@ void saveConfig() {
   doc["conType"] = Myconfig.conType;
   doc["fileStorage"] = Myconfig.fileStorage;
   doc["romCheck"] = Myconfig.romCheck;
+  doc["scrFont"] = Myconfig.scrFont;
+  doc["scrTajol"] = Myconfig.scrTajol;
+  doc["scale"] = Myconfig.scale;
   serializeJson(doc, configFile);
   configFile.close();
 }
@@ -988,56 +1020,379 @@ void timerIsr() {
   //encoder->service();
 }
 
-void findFonts() {
-  File dr = FFat.open("/");
-  int i = 0;
-  if (!dr) {
-      linePrint("Nem található betűtípus");
-  } else {
-    while (true) {
-      File entry =  dr.openNextFile();
-      if (!entry) {
-        break;
-      }
-      String name = entry.name();
-      if (name.endsWith(".vlw")) {
-        name.remove(name.length() - 4);
-        fonts[i++] = name;
-        linePrint(name);
-      }
-      
-      entry.close();
-    }
-    // i--;
-    // prompt* fontList[i];
-    // for (int j = 0; j < i-1; j++) {
-    //   fontList[j] = new menuValue<int>(fonts[j].c_str(),j);
-    // }
-    // //mnuFont = new menu("Betűtípus",fontList,i);
-    // //choose<int>& durMenu =*new choose<int>("Duration",duration,sizeof(durData)/sizeof(prompt*),durData);
-    // mnuFont = *new Menu::select<int>("Betűtípus : ",selFont
-    // ,sizeof(fontList)/sizeof(prompt*),fontList,(Menu::callback)actFontChange,anyEvent);
-    dr.close();
-  }
-}
 
 result actFontChange(eventMask e,navNode& nav ,prompt& item) {
   if (e==exitEvent) {
-    Serial.println("");
-    Serial.print("selected font: " + fonts[selFont]);
-    //delay(5000);
-    //item.
-    tft2.unloadFont();
-    tft2.loadFont(fonts[selFont],FFat);
-    tft2.setTextSize(textScale);
-    tft2.fillScreen(TFT_BLACK);
-    tft2.setTextColor(TFT_RED, TFT_BLACK);
-    tft2.println("ESP32 Eprom programmer");
-    tft2.setTextSize(textScale);
-    tft2.setCursor(0, 0);
+    tft.unloadFont();
+    tft.loadFont(fonts[selFont],FFat);
+    Myconfig.scrFont = selFont;
+    tft.setTextSize(textScale);
+    tft.fillScreen(TFT_BLACK);
+    tft.setTextColor(TFT_RED, TFT_BLACK);
+    tft.println("ESP32 Eprom programmer");
+    tft.setTextSize(textScale);
+    tft.setCursor(0, 0);
     nav.reset();
-    // nav.timeOut=70;
-    // nav.idleTask=idle;//point a function to be used when menu is suspended
   }
   return proceed;
 }
+
+result actScrTajol(eventMask e,navNode& nav ,prompt& item) {
+  if (e==exitEvent) {
+    tft.setRotation(Myconfig.scrTajol);
+    tft.setTextSize(textScale);
+    tft.fillScreen(TFT_BLACK);
+    tft.setTextColor(TFT_RED, TFT_BLACK);
+    tft.println("ESP32 Eprom programmer");
+    tft.setTextSize(textScale);
+    tft.setCursor(0, 0);
+    nav.reset();
+  }
+  return proceed;
+}
+
+result actChangeScale(eventMask e,navNode& nav ,prompt& item) {
+  if (e==exitEvent) {
+    tft.setTextSize(Myconfig.scale);
+    tft.fillScreen(TFT_BLACK);
+    tft.setTextColor(TFT_RED, TFT_BLACK);
+    tft.println("ESP32 Eprom programmer");
+    tft.setCursor(0, 0);
+    nav.reset();
+  }
+  return proceed;
+}
+
+result actListSettings(eventMask e, navNode& nav, prompt& item) {
+  File f = FFat.open("/config.json","r");
+  if (!f) {
+    Serial.println();
+    Serial.println("Nem találom a konfigurációs fájl!");
+  } else {
+    while (true) {
+      String str1 = f.readString();
+      if (str1 == NULL) break;
+      Serial.println(str1);
+    }
+  }
+  Serial.println();
+  return proceed;
+}
+
+unsigned long testFillScreen() {
+  unsigned long start = micros();
+  tft.fillScreen(TFT_BLACK);
+  tft.fillScreen(TFT_RED);
+  tft.fillScreen(TFT_GREEN);
+  tft.fillScreen(TFT_BLUE);
+  tft.fillScreen(TFT_BLACK);
+  return micros() - start;
+}
+
+unsigned long testText() {
+  tft.fillScreen(TFT_BLACK);
+  unsigned long start = micros();
+  tft.setCursor(0, 0);
+  tft.setTextColor(TFT_WHITE);  tft.setTextSize(1);
+  tft.println("Hello World!");
+  tft.setTextColor(TFT_YELLOW); tft.setTextSize(2);
+  tft.println(1234.56);
+  tft.setTextColor(TFT_RED);    tft.setTextSize(3);
+  tft.println(0xDEADBEEF, HEX);
+  tft.println();
+  tft.setTextColor(TFT_GREEN);
+  tft.setTextSize(5);
+  tft.println("Groop");
+  tft.setTextSize(2);
+  tft.println("I implore thee,");
+  //tft.setTextColor(TFT_GREEN,TFT_BLACK);
+  tft.setTextSize(1);
+  tft.println("my foonting turlingdromes.");
+  tft.println("And hooptiously drangle me");
+  tft.println("with crinkly bindlewurdles,");
+  tft.println("Or I will rend thee");
+  tft.println("in the gobberwarts");
+  tft.println("with my blurglecruncheon,");
+  tft.println("see if I don't!");
+  return micros() - start;
+}
+
+unsigned long testLines(uint16_t color) {
+  unsigned long start, t;
+  int           x1, y1, x2, y2,
+                w = tft.width(),
+                h = tft.height();
+
+  tft.fillScreen(TFT_BLACK);
+
+  x1 = y1 = 0;
+  y2    = h - 1;
+  start = micros();
+  for (x2 = 0; x2 < w; x2 += 6) tft.drawLine(x1, y1, x2, y2, color);
+  x2    = w - 1;
+  for (y2 = 0; y2 < h; y2 += 6) tft.drawLine(x1, y1, x2, y2, color);
+  t     = micros() - start; // fillScreen doesn't count against timing
+  yield();
+  tft.fillScreen(TFT_BLACK);
+
+  x1    = w - 1;
+  y1    = 0;
+  y2    = h - 1;
+  start = micros();
+  for (x2 = 0; x2 < w; x2 += 6) tft.drawLine(x1, y1, x2, y2, color);
+  x2    = 0;
+  for (y2 = 0; y2 < h; y2 += 6) tft.drawLine(x1, y1, x2, y2, color);
+  t    += micros() - start;
+  yield();
+  tft.fillScreen(TFT_BLACK);
+
+  x1    = 0;
+  y1    = h - 1;
+  y2    = 0;
+  start = micros();
+  for (x2 = 0; x2 < w; x2 += 6) tft.drawLine(x1, y1, x2, y2, color);
+  x2    = w - 1;
+  for (y2 = 0; y2 < h; y2 += 6) tft.drawLine(x1, y1, x2, y2, color);
+  t    += micros() - start;
+  yield();
+  tft.fillScreen(TFT_BLACK);
+
+  x1    = w - 1;
+  y1    = h - 1;
+  y2    = 0;
+  start = micros();
+  for (x2 = 0; x2 < w; x2 += 6) tft.drawLine(x1, y1, x2, y2, color);
+  x2    = 0;
+  for (y2 = 0; y2 < h; y2 += 6) tft.drawLine(x1, y1, x2, y2, color);
+  yield();
+  return micros() - start;
+}
+
+unsigned long testFastLines(uint16_t color1, uint16_t color2) {
+  unsigned long start;
+  int           x, y, w = tft.width(), h = tft.height();
+
+  tft.fillScreen(TFT_BLACK);
+  start = micros();
+  for (y = 0; y < h; y += 5) tft.drawFastHLine(0, y, w, color1);
+  for (x = 0; x < w; x += 5) tft.drawFastVLine(x, 0, h, color2);
+
+  return micros() - start;
+}
+
+unsigned long testRects(uint16_t color) {
+  unsigned long start;
+  int           n, i, i2,
+                cx = tft.width()  / 2,
+                cy = tft.height() / 2;
+
+  tft.fillScreen(TFT_BLACK);
+  n     = min(tft.width(), tft.height());
+  start = micros();
+  for (i = 2; i < n; i += 6) {
+    i2 = i / 2;
+    tft.drawRect(cx - i2, cy - i2, i, i, color);
+  }
+
+  return micros() - start;
+}
+
+unsigned long testFilledRects(uint16_t color1, uint16_t color2) {
+  unsigned long start, t = 0;
+  int           n, i, i2,
+                cx = tft.width()  / 2 - 1,
+                cy = tft.height() / 2 - 1;
+
+  tft.fillScreen(TFT_BLACK);
+  n = min(tft.width(), tft.height());
+  for (i = n - 1; i > 0; i -= 6) {
+    i2    = i / 2;
+    start = micros();
+    tft.fillRect(cx - i2, cy - i2, i, i, color1);
+    t    += micros() - start;
+    // Outlines are not included in timing results
+    tft.drawRect(cx - i2, cy - i2, i, i, color2);
+  }
+
+  return t;
+}
+
+unsigned long testFilledCircles(uint8_t radius, uint16_t color) {
+  unsigned long start;
+  int x, y, w = tft.width(), h = tft.height(), r2 = radius * 2;
+
+  tft.fillScreen(TFT_BLACK);
+  start = micros();
+  for (x = radius; x < w; x += r2) {
+    for (y = radius; y < h; y += r2) {
+      tft.fillCircle(x, y, radius, color);
+    }
+  }
+
+  return micros() - start;
+}
+
+unsigned long testCircles(uint8_t radius, uint16_t color) {
+  unsigned long start;
+  int           x, y, r2 = radius * 2,
+                      w = tft.width()  + radius,
+                      h = tft.height() + radius;
+
+  // Screen is not cleared for this one -- this is
+  // intentional and does not affect the reported time.
+  start = micros();
+  for (x = 0; x < w; x += r2) {
+    for (y = 0; y < h; y += r2) {
+      tft.drawCircle(x, y, radius, color);
+    }
+  }
+
+  return micros() - start;
+}
+
+unsigned long testTriangles() {
+  unsigned long start;
+  int           n, i, cx = tft.width()  / 2 - 1,
+                      cy = tft.height() / 2 - 1;
+
+  tft.fillScreen(TFT_BLACK);
+  n     = min(cx, cy);
+  start = micros();
+  for (i = 0; i < n; i += 5) {
+    tft.drawTriangle(
+      cx    , cy - i, // peak
+      cx - i, cy + i, // bottom left
+      cx + i, cy + i, // bottom right
+      tft.color565(0, 0, i));
+  }
+
+  return micros() - start;
+}
+
+unsigned long testFilledTriangles() {
+  unsigned long start, t = 0;
+  int           i, cx = tft.width()  / 2 - 1,
+                   cy = tft.height() / 2 - 1;
+
+  tft.fillScreen(TFT_BLACK);
+  start = micros();
+  for (i = min(cx, cy); i > 10; i -= 5) {
+    start = micros();
+    tft.fillTriangle(cx, cy - i, cx - i, cy + i, cx + i, cy + i,
+                     tft.color565(0, i, i));
+    t += micros() - start;
+    tft.drawTriangle(cx, cy - i, cx - i, cy + i, cx + i, cy + i,
+                     tft.color565(i, i, 0));
+  }
+
+  return t;
+}
+
+unsigned long testRoundRects() {
+  unsigned long start;
+  int           w, i, i2,
+                cx = tft.width()  / 2 - 1,
+                cy = tft.height() / 2 - 1;
+
+  tft.fillScreen(TFT_BLACK);
+  w     = min(tft.width(), tft.height());
+  start = micros();
+  for (i = 0; i < w; i += 6) {
+    i2 = i / 2;
+    tft.drawRoundRect(cx - i2, cy - i2, i, i, i / 8, tft.color565(i, 0, 0));
+  }
+
+  return micros() - start;
+}
+
+void testRotation() {
+  tft.fillScreen(TFT_BLACK);
+  for (uint8_t rotation = 0; rotation < 4; rotation++) {
+    tft.setRotation(rotation);
+    testText();
+    delay(2000);
+  }
+}
+
+unsigned long testFilledRoundRects() {
+  unsigned long start;
+  int           i, i2,
+                cx = tft.width()  / 2 - 1,
+                cy = tft.height() / 2 - 1;
+
+  tft.fillScreen(TFT_BLACK);
+  start = micros();
+  for (i = min(tft.width(), tft.height()); i > 20; i -= 6) {
+    i2 = i / 2;
+    tft.fillRoundRect(cx - i2, cy - i2, i, i, i / 8, tft.color565(0, i, 0));
+    yield();
+  }
+
+  return micros() - start;
+}
+
+result actScreenTest(eventMask e, navNode& nav, prompt& item) {
+  unsigned long total = 0;
+  unsigned long tn = 0;
+  tn = micros();
+  tft.fillScreen(TFT_BLACK);
+  yield(); Serial.println(F("Benchmark                Time (microseconds)"));
+
+  yield(); Serial.print(F("Screen fill              "));
+  yield(); Serial.println(testFillScreen());
+
+  yield(); Serial.print(F("Text                     "));
+  yield(); Serial.println(testText());
+
+  yield(); Serial.print(F("Lines                    "));
+  yield(); Serial.println(testLines(TFT_CYAN));
+
+  yield(); Serial.print(F("Horiz/Vert Lines         "));
+  yield(); Serial.println(testFastLines(TFT_RED, TFT_BLUE));
+
+  yield(); Serial.print(F("Rectangles (outline)     "));
+  yield(); Serial.println(testRects(TFT_GREEN));
+
+  yield(); Serial.print(F("Rectangles (filled)      "));
+  yield(); Serial.println(testFilledRects(TFT_YELLOW, TFT_MAGENTA));
+
+  yield(); Serial.print(F("Circles (filled)         "));
+  yield(); Serial.println(testFilledCircles(10, TFT_MAGENTA));
+
+  yield(); Serial.print(F("Circles (outline)        "));
+  yield(); Serial.println(testCircles(10, TFT_WHITE));
+
+  yield(); Serial.print(F("Triangles (outline)      "));
+  yield(); Serial.println(testTriangles());
+
+  yield(); Serial.print(F("Triangles (filled)       "));
+  yield(); Serial.println(testFilledTriangles());
+
+  yield(); Serial.print(F("Rounded rects (outline)  "));
+  yield(); Serial.println(testRoundRects());
+
+  yield(); Serial.print(F("Rounded rects (filled)   "));
+  yield(); Serial.println(testFilledRoundRects());
+
+  yield(); Serial.println(F("Done!")); yield();
+
+  testRotation();
+  delay(2000);
+  nav.reset();
+
+  return proceed;
+}
+ void getFile(String fname, byte tfile[]) {
+  uint32_t fsize = sizeof(tfile);
+  File f = FFat.open(fname,"w");
+  if (!f) {
+    Serial.println("");
+    Serial.println("Nem sikerült a fájl létrehozása!");
+    return;
+  }
+  for(uint32_t i=0;i<fsize;i++) {
+    f.write((uint8_t)tfile[i]);
+  }
+  f.flush();
+  f.close();
+ }
