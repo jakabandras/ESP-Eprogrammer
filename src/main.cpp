@@ -10,7 +10,6 @@
 #include <Adafruit_GFX.h>
 #include <Wifi.h>
 #include <WiFiUdp.h>
-#include <ClickEncoder.h>
 #include <menu.h>
 #include <menuIO/adafruitGfxOut.h>
 #include <menuIO/TFT_eSPIOut.h>
@@ -96,7 +95,7 @@ void timerIsr();
 void parseCommand(char *command, IPAddress remoteIP, uint16_t remotePort);
 void saveConfig();
 int sendAddress(uint16_t address);
-void getFile(String fname, byte tfile[]);
+void getFile(String fname, uint32_t fsize);
 analogAxis<JOY_Y,10,false> ay;
 
 #define joyBtn 12
@@ -1378,20 +1377,45 @@ result actScreenTest(eventMask e, navNode& nav, prompt& item) {
 
   testRotation();
   delay(2000);
+  tft.fillScreen(TFT_BLACK);
   nav.reset();
 
   return proceed;
 }
- void getFile(String fname, byte tfile[]) {
-  uint32_t fsize = sizeof(tfile);
+  // if (Myconfig.conType == 0) {
+  //   int packetSize = udp.parsePacket();
+  //   if (packetSize) {
+  //     char packetBuffer[255];
+  //     int len = udp.read(packetBuffer, 255);
+  //     if (len > 0) {
+  //       packetBuffer[len] = 0;
+  //     }
+  //     remoteIP = udp.remoteIP();
+  //     remotePort = udp.remotePort();
+  //     parseCommand(packetBuffer, remoteIP, remotePort);
+  //   }
+  // }
+
+ void getFile(String fname,uint32_t fsize) {
+  const char command[] = "READYFORRECEIVE";
+  uint32_t readed = 0;
   File f = FFat.open(fname,"w");
   if (!f) {
     Serial.println("");
     Serial.println("Nem sikerült a fájl létrehozása!");
     return;
   }
-  for(uint32_t i=0;i<fsize;i++) {
-    f.write((uint8_t)tfile[i]);
+  udp.write((const uint8_t *)command, strlen(command));
+  // fájl fogadása
+  while(readed < fsize) {
+    int pckSize = udp.parsePacket();
+    char pckBuff[255];
+    int len = udp.read(pckBuff,255);
+    if (len > 0) {
+      f.write((uint8_t *)pckBuff,len);
+      readed += len;
+    }
+
   }
   f.flush();
   f.close();
