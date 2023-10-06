@@ -100,7 +100,7 @@ analogAxis<JOY_Y,10,false> ay;
 
 #define joyBtn 12
 
-keyMap btnsMap[]={{-joyBtn,defaultNavCodes[enterCmd].ch}};//negative pin numbers use internal pull-up, this is on when low
+keyMap btnsMap[]={{joyBtn,defaultNavCodes[enterCmd].ch}};//negative pin numbers use internal pull-up, this is on when low
 keyIn<1> btns(btnsMap);// 1 is the number of keys
 
 
@@ -348,7 +348,7 @@ void setup() {
       linePrint("Nem sikerült megnyitni a konfigurációs fájlt olvasásra");
     }
     DeserializationError error = deserializeJson(doc, configFile);
-    if (!error) { // Ezt majd vissza kell írni
+    if (error) { // Ezt majd vissza kell írni
       linePrint("Nem sikerült beolvasni a konfigurációs fájlt");
       setDefConfig();
       saveConfig();
@@ -405,7 +405,8 @@ void setup() {
   delay(500);
   tft.begin();
   //fex.drawJpg(Betti1, sizeof(Betti1), 0, 0);
-  fex.drawJpgFile(FFat, "/Betti2.jpg", 0, 0);
+  fex.drawBmp(FFat,"/Betti2.bmp",0,0);
+  //fex.drawJpgFile(FFat, "/Betti2.jpg", 0, 0);
   
   delay(5000);
   tft.loadFont(fonts[selFont],FFat);
@@ -426,6 +427,7 @@ void loop() {
   IPAddress remoteIP;
   uint16_t remotePort;
   nav.poll();
+  
   #ifdef ESP8266
   //digitalWrite(LEDPIN, ledCtrl);
   #endif
@@ -676,7 +678,7 @@ void setDefConfig() {
   Myconfig.fileStorage = 0;
   Myconfig.romCheck = 0;
   Myconfig.scrFont = 0;
-  Myconfig.scrTajol = 1;
+  Myconfig.scrTajol = 0;
   Myconfig.scale = 1.5;
 }
 
