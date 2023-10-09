@@ -59,8 +59,41 @@ void draw()
     if (selected) {
     }
   }
-  loop();
+  //loop();
 }
+
+void convertToBMP(String inputFileName, String outputFileName) {
+  PImage img = loadImage(inputFileName);
+  
+  if (img == null) {
+    println("A fájl nem található vagy nem megfelelő formátumú.");
+    return;
+  }
+  
+  int newWidth, newHeight;
+  
+  // Döntsd el az új méretet az arány megtartása alapján
+  if (img.width > img.height) {
+    newWidth = 320;
+    newHeight = int(img.height * 320.0 / img.width);
+  } else {
+    newWidth = int(img.width * 480.0 / img.height);
+    newHeight = 480;
+  }
+  
+  // Átméretezés
+  img.resize(newWidth, newHeight);
+  
+  // Készítsünk egy új képet az új mérettel
+  PImage resizedImg = createImage(newWidth, newHeight, RGB);
+  resizedImg.copy(img, 0, 0, img.width, img.height, 0, 0, newWidth, newHeight);
+  
+  // Mentsük el BMP formátumban
+  resizedImg.save(outputFileName);
+  
+  println("A fájl sikeresen átkonvertálva és elmentve: " + outputFileName);
+}
+
 
 void convertTo16BitJPG(String inputFileName, String outputFileName) {
   PImage img = loadImage(inputFileName);
@@ -99,4 +132,3 @@ void convertTo16BitJPG(String inputFileName, String outputFileName) {
   
   println("A fájl sikeresen átkonvertálva és elmentve: " + outputFileName);
 }
-

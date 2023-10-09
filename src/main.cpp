@@ -14,7 +14,7 @@
 #include <menuIO/adafruitGfxOut.h>
 #include <menuIO/TFT_eSPIOut.h>
 #include <menuIO/analogAxisIn.h>
-#include <menuIO/keyIn.h>
+#include <menuIO/AltkeyIn.h>
 //#include <menuIO/clickEncoderIn.h>
 #include <menuIO/serialOut.h>
 #include <menuIO/serialIn.h>
@@ -33,6 +33,7 @@ struct  Config {
   int scrFont;
   int scrTajol=0;
   float scale = 1.5;
+  int splash = 0;
 };
 
 
@@ -89,7 +90,7 @@ result actScrTajol(eventMask e,navNode& nav ,prompt& item);
 result actChangeScale(eventMask e,navNode& nav ,prompt& item);
 result actListSettings(eventMask e, navNode& nav, prompt& item);
 result actScreenTest(eventMask e, navNode& nav, prompt& item);
-void listSPIFFS();
+result actSplash(eventMask e, navNode& nav, prompt& item);
 void setDefConfig();
 void timerIsr();
 void parseCommand(char *command, IPAddress remoteIP, uint16_t remotePort);
@@ -131,6 +132,10 @@ String fonts[30] = {
   ,"InkFree-14"
   ,"LeelawadeeUI-14"
   ,"MVBoli-14"
+};
+
+String bitmaps[50] = {
+  "/Betti2.bmp"
 };
 
 
@@ -221,6 +226,11 @@ SELECT(Myconfig.scrTajol,mnuScrTajol,"Kijelző tájolása :",actScrTajol,exitEve
   ,VALUE("Vízszintes tükrözve",3,doNothing,noEvent)
 );
 
+SELECT(Myconfig.splash,mnuSplash,"Bejelentkező kép",actSplash,exitEvent,noStyle
+  ,VALUE("Betti2.bmp",0,doNothing,noEvent)
+  ,VALUE("Betti3.bmp",1,doNothing,noEvent)
+);
+
 //Kijelző beállítása menü
 MENU(mnuScreen,"Kijelző beállítása",doNothing,noEvent,noStyle
   ,SUBMENU(mnuFont)
@@ -296,26 +306,35 @@ void formatFFat() {
 
 void linePrint(const char *text) {
   Serial.println(text);
+  tft.println(text);
 }
 
 void linePrint(const String text) {
   Serial.println(text);
+  tft.println(text);
+}
+
+void charPrint(const char *text) {
+  Serial.print(text);
+  tft.print(text);
 }
 
 
 void setup() {
   Serial.begin(115200);
   while(!Serial);
+  tft.begin();
+  tft.fillScreen(TFT_BLACK);
   linePrint("ESP32 Eprom programmer");
-  Serial.println("Joystick kalibrálása");
+  linePrint("Joystick kalibrálása");
   uint32_t iKalVal = 0;
   for (int i = 0; i < 50; i++) {
-    Serial.print(".");
+    charPrint(".");
     iKalVal += analogRead(JOY_Y);
     delay(100);
   }
   ay.setCalibration(iKalVal / 50);
-  Serial.println("Kész");
+  linePrint("Kész");
   if(!FFat.begin()){
     linePrint("FFat csatolása sikertelen");
     formatFFat();
@@ -339,6 +358,7 @@ void setup() {
     doc["romCheck"] = Myconfig.romCheck;
     doc["scrFont"] = Myconfig.scrFont;
     doc["scrTajol"] = Myconfig.scrTajol;
+    doc["splash"] = Myconfig.splash;
     serializeJson(doc, configFile);
     configFile.close();
   } else {
@@ -362,48 +382,47 @@ void setup() {
       Myconfig.scrFont = doc["scrFont"];
       selFont = Myconfig.scrFont;
       Myconfig.scrTajol = doc["scrTajol"];
+      Myconfig.splash = doc["splash"];
     }
   }
   linePrint("Konfigurációs fájl beolvasva");
   if (Myconfig.conType == 0 || Myconfig.conType == 1) {
-    Serial.println(Myconfig.ssid);
+    linePrint(Myconfig.ssid);
     WiFi.begin(Myconfig.ssid, Myconfig.pass);
-    Serial.print("Csatlakozás a ");
-    Serial.print(Myconfig.ssid);
-    Serial.println(" hálózathoz");
+    linePrint("Csatlakozás a ");
+    linePrint(Myconfig.ssid);
+    linePrint(" hálózathoz");
     int i = 0;
     while (WiFi.status() != WL_CONNECTED) {
       delay(500);
-      Serial.print(".");
+      charPrint(".");
       i++;
       if (i > 20) {
-        Serial.println("Nem sikerült csatlakozni a hálózathoz");
+        linePrint("Nem sikerült csatlakozni a hálózathoz");
         break;
       }
     }
-    Serial.println("");
-    Serial.println("WiFi kapcsolat létrejött");
-    Serial.print("IP cím: ");
-    Serial.println(WiFi.localIP());
+    linePrint("");
+    linePrint("WiFi kapcsolat létrejött");
+    charPrint("IP cím: ");
+    linePrint(WiFi.localIP().toString());
     char ip[47];
     WiFi.localIP().toString().toCharArray(ip, 47);
     strcpy(Myconfig.ipaddr, ip);
 
   }
   if (Myconfig.conType == 0) {
-    Serial.println("UDP kapcsolat");
+    linePrint("UDP kapcsolat");
   } else if (Myconfig.conType == 1) {
-    Serial.println("HTTP kapcsolat");
+    linePrint("HTTP kapcsolat");
   } else if (Myconfig.conType == 2) {
-    Serial.println("USB/Serial kapcsolat");
+    linePrint("USB/Serial kapcsolat");
   }
   if (Myconfig.conType == 0) {
     udp.begin(Myconfig.udpport);
   }
-  //encoder = new ClickEncoder(ENCODER_PINA, ENCODER_PINB, ENCODER_BTN, 4);
 
   delay(500);
-  tft.begin();
   //fex.drawJpg(Betti1, sizeof(Betti1), 0, 0);
   fex.drawBmp(FFat,"/Betti2.bmp",0,0);
   //fex.drawJpgFile(FFat, "/Betti2.jpg", 0, 0);
@@ -427,7 +446,8 @@ void loop() {
   IPAddress remoteIP;
   uint16_t remotePort;
   nav.poll();
-  
+  int kp = digitalRead(joyBtn);
+  if (kp) Serial.println("KKKKKK");
   #ifdef ESP8266
   //digitalWrite(LEDPIN, ledCtrl);
   #endif
@@ -480,9 +500,13 @@ result doAlert(eventMask e, prompt &item) {
 result idle(menuOut &o, idleEvent e) {
   // o.clear();
   switch(e) {
-    case idleStart:o.println("suspending menu!");break;
-    case idling:o.println("suspended...");break;
-    case idleEnd:o.println("resuming menu.");
+    case idleStart:
+      o.clear();
+      o.setCursor(0,0);
+      o.println("Menü felfüggesztése...");
+      break;
+    case idling:o.println("felfüggesztve...");break;
+    case idleEnd:o.println("Menü folytatása.");
       nav.reset();
       break;
   }
@@ -600,7 +624,10 @@ result actListFiles(eventMask e,prompt& item) {
   nav.idleOn(idleListFiles);
   return proceed;
 }
-
+/***************************************************************************************
+** Function name:           sendAddress
+** Description:             Írandó cím az EPROM-ba
+***************************************************************************************/
 int sendAddress(uint16_t address) {
   // Loop through the 12 bits from MSB to LSB
   for (int i = 11; i >= 0; i--) {
@@ -620,7 +647,10 @@ int sendAddress(uint16_t address) {
   }
   return 0;
 }
-
+/***************************************************************************************
+** Function name:           writeParallelEprom
+** Description:             Párhuzamos programozásu Eprom írása
+***************************************************************************************/
 int writeParallelEprom(uint16_t address, uint8_t data) {
   int result = 0;
   // Set the address pins
@@ -641,32 +671,10 @@ int writeParallelEprom(uint16_t address, uint8_t data) {
   return result;
 }
 
-void listSPIFFS() {
-  Serial.println("Listing SPIFFS files");
-  File root = FFat.open("/");
-  if (!root) {
-    Serial.println("Failed to open directory");
-    return;
-  }
-  if (!root.isDirectory()) {
-    Serial.println("Not a directory");
-    return;
-  }
-  File file = root.openNextFile();
-  if (!file) {
-    Serial.println("No files found");
-    return;
-  }
-  while (file) {
-    Serial.print("  FILE: ");
-    Serial.print(file.name());
-    Serial.print("  SIZE: ");
-    Serial.println(file.size());
-    file = root.openNextFile();
-  }
-  Serial.flush();
-}
-
+/***************************************************************************************
+** Function name:           setDefConfig
+** Description:             Alapértelmezett paraméterek beállítása
+***************************************************************************************/
 void setDefConfig() {
   strcpy(Myconfig.ssid,"DIGI_7fe918");
   //strcpy(Myconfig.ssid,"Wifi_neve");
@@ -680,6 +688,7 @@ void setDefConfig() {
   Myconfig.scrFont = 0;
   Myconfig.scrTajol = 0;
   Myconfig.scale = 1.5;
+  Myconfig.splash = 0;
 }
 
 //TODO: HTTP kapcsolat megírása
@@ -709,7 +718,10 @@ result filePick(eventMask event, navNode& nav, prompt &item) {
   return proceed;
 }
 
-
+/***************************************************************************************
+** Function name:           parseCommand
+** Description:             UDP parancsok feldolgozása
+***************************************************************************************/
 void parseCommand(char *command, IPAddress remoteIP, uint16_t remotePort) {
   //TODO: UDP parancsok feldolgozása,és a fájlok fogadása. Fejlesztés alatt
   //Parancsok: PUTFILE, GETFILE, LISTFILES, GETCONFIG, SETCONFIG, GETROM, SETROM, 
@@ -995,7 +1007,10 @@ result actHttpConnect(eventMask e,prompt& item) {
   nav.idleOn(idleHttpConnect);
   return proceed;
 }
-
+/***************************************************************************************
+** Function name:           saveConfig
+** Description:             Beállítások mentése
+***************************************************************************************/
 void saveConfig() {
   File configFile = FFat.open("/config.json", "w");
   if (!configFile) {
@@ -1011,6 +1026,7 @@ void saveConfig() {
   doc["scrFont"] = Myconfig.scrFont;
   doc["scrTajol"] = Myconfig.scrTajol;
   doc["scale"] = Myconfig.scale;
+  doc["splash"] = Myconfig.splash;
   serializeJson(doc, configFile);
   configFile.close();
 }
@@ -1080,6 +1096,15 @@ result actListSettings(eventMask e, navNode& nav, prompt& item) {
   return proceed;
 }
 
+result actSplash(eventMask e, navNode& nav, prompt& item) {
+  //Ez még csak teszt, később meg kell írni....
+  fex.drawBmp(FFat,"/Betti2.bmp",0,0);
+  delayMicroseconds(5000);
+  nav.reset();
+  return proceed;
+}
+
+
 unsigned long testFillScreen() {
   unsigned long start = micros();
   tft.fillScreen(TFT_BLACK);
@@ -1089,7 +1114,10 @@ unsigned long testFillScreen() {
   tft.fillScreen(TFT_BLACK);
   return micros() - start;
 }
-
+/***************************************************************************************
+** Function name:           testText
+** Description:             Szöveg kiírás tesztelése
+***************************************************************************************/
 unsigned long testText() {
   tft.fillScreen(TFT_BLACK);
   unsigned long start = micros();
@@ -1337,7 +1365,7 @@ result actScreenTest(eventMask e, navNode& nav, prompt& item) {
   unsigned long tn = 0;
   tn = micros();
   tft.fillScreen(TFT_BLACK);
-  yield(); Serial.println(F("Benchmark                Time (microseconds)"));
+  yield(); Serial.println(F("Teszt                    Idő  (microseconds)"));
 
   yield(); Serial.print(F("Screen fill              "));
   yield(); Serial.println(testFillScreen());
@@ -1381,7 +1409,8 @@ result actScreenTest(eventMask e, navNode& nav, prompt& item) {
   delay(2000);
   tft.fillScreen(TFT_BLACK);
   nav.reset();
-
+  tft.setRotation(Myconfig.scrTajol);
+  
   return proceed;
 }
   // if (Myconfig.conType == 0) {
