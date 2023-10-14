@@ -20,8 +20,10 @@
 #include <menuIO/serialIn.h>
 #include <menuIO/chainStream.h>
 #include <plugin/SdFatMenu.h>
-#include <TFT_eFEX.h>              // Include the extension graphics functions library
-
+#include <TFT_eFEX.h>   // Include the extension graphics functions library
+#include <AnalogJoystick.h>
+#include <TFT_Menu.h>
+//#include "filemenu.h"
 struct  Config {
   char ssid[20];
   char pass[20];
@@ -45,10 +47,6 @@ struct  Config {
 #define JOY_X 36
 #define JOY_Y 39
 #define JOY_BTN 12
-
-
-
-
 
 const colorDef<uint16_t> colors[6] MEMMODE={
   {{(uint16_t)TFT_BLACK,(uint16_t)TFT_BLACK}, {(uint16_t)TFT_BLACK, (uint16_t)TFT_BLUE,  (uint16_t)TFT_BLUE}},//bgColor
@@ -101,7 +99,9 @@ analogAxis<JOY_Y,10,false> ay;
 
 #define joyBtn 12
 
-keyMap btnsMap[]={{joyBtn,defaultNavCodes[enterCmd].ch}};//negative pin numbers use internal pull-up, this is on when low
+AnalogJoystick mJoy(JOY_X,JOY_Y,joyBtn,2250);
+
+keyMap btnsMap[]={{-joyBtn,defaultNavCodes[enterCmd].ch}};//negative pin numbers use internal pull-up, this is on when low
 keyIn<1> btns(btnsMap);// 1 is the number of keys
 
 
