@@ -21,8 +21,8 @@
 #include <menuIO/chainStream.h>
 #include <plugin/SdFatMenu.h>
 #include <TFT_eFEX.h>   // Include the extension graphics functions library
-#include <AnalogJoystick.h>
-#include <TFT_Menu.h>
+//#include <AnalogJoystick.h>
+#include "TFT_Menu.h"
 //#include "filemenu.h"
 struct  Config {
   char ssid[20];
@@ -95,6 +95,8 @@ void parseCommand(char *command, IPAddress remoteIP, uint16_t remotePort);
 void saveConfig();
 int sendAddress(uint16_t address);
 void getFile(String fname, uint32_t fsize);
+void fillItems();
+
 analogAxis<JOY_Y,10,false> ay;
 
 #define joyBtn 12
@@ -122,6 +124,9 @@ char ipaddr[47] = "                                              ";
 int fileStorage = 0;
 Config Myconfig;
 WiFiUDP udp;
+TFT_MENU xMenu(tft,mJoy,1);
+std::vector<MENU> xMenuItems;
+
 String fonts[30] = {
   "Arial14"
   ,"Arial-BoldMT-14"
@@ -598,25 +603,15 @@ result actLoadSettings(eventMask e,prompt& item) {
 
 result idleListFiles(menuOut& o,idleEvent e) {
   if (e==idling) {
-    o.clear();
-    
-    o.setCursor(0,0);
-    o.println("listing files");
-    o.println("on SPIFFS:");
-    o.println("-------------");
-    File root = FFat.open("/");
-    if (!root) {
-      o.println("Failed to open directory");
-      delay(2000);
-      return proceed;
-    } else {
-      while (File file = root.openNextFile()) {
-        o.println(file.name());
-        file.close();
-      }
-    }
-    o.print("press [select]");
-    o.println("to continue...");
+    MENU mymenu[] = {
+      {"Teszt Menü :",           0 },
+      {"Teszt 1",                1 },
+      {"Teszt 2",                2 },
+      {"Valami",                 3 }
+    };
+    TFT_MENU menu(tft,mJoy,1);
+    int mm = menu.show(mymenu,1);
+    o.println(mymenu[mm].option);
   }
   return proceed;
 }
