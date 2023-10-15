@@ -1,4 +1,7 @@
 #include "TFT_Menu.h"
+#include <JoystickLib.h>
+#include <FFat.h>
+#include <FS.h>
 
 ///////////////////////////////////////////////////////////////////////////
 //
@@ -11,14 +14,16 @@
 //
 ///////////////////////////////////////////////////////////////////////////
 
-TFT_MENU::TFT_MENU(TFT_eSPI &tfts, AnalogJoystick &joystick, uint8_t textSize)
+TFT_MENU::TFT_MENU(TFT_eSPI &tfts, Joystick &joystick, uint8_t textSize)
 {
 	this->tft = &tfts;
 	this->joystick = &joystick;
-	fontHeight = tft->gFont.yAdvance * textSize;
-	fontWidth = tft->gFont.spaceWidth * textSize;
+	fontHeight = 14;
+	fontWidth = 8;
 	maxChars = tft->width() / fontWidth;
+  Serial.println("Max. karakter: "+String(maxChars));
 	maxLines = tft->height() / fontHeight;
+  Serial.println("Max. sor: "+String(maxLines));
 }
 
 ///////////////////////////////////////////////////////////////////////////
@@ -42,7 +47,7 @@ TFT_MENU::TFT_MENU(TFT_eSPI &tfts, AnalogJoystick &joystick, uint8_t textSize)
 //
 ///////////////////////////////////////////////////////////////////////////
 
-int8_t TFT_MENU::show(MENU menu[], int8_t active = 1)
+int8_t TFT_MENU::show(MENU menu[], int8_t active)
 {
 
 	uint8_t menuCount = 0;
@@ -67,7 +72,7 @@ int8_t TFT_MENU::show(MENU menu[], int8_t active = 1)
 	tft->fillScreen(nB);
 
 	// Print the menu header centered on the first line
-
+  tft->setCursor(0,0);
 	tft->setTextColor(hF, hB);
 	uint8_t len = menu[0].option.length();
 
@@ -76,14 +81,14 @@ int8_t TFT_MENU::show(MENU menu[], int8_t active = 1)
 	else
 		i = 1;
 
-	tft->fillRect(0, 0, 127, fontHeight, hB);
+	tft->fillRect(0, 0, 319, fontHeight, hB);
 	tft->setCursor(i, 0);
 	tft->println(menu[0].option);
 
 	// determine the number of items in the menu
 
 	i = 0;
-	while (menu[i++].option)
+	while (!menu[i++].option.isEmpty())
 		menuCount++;
 
 	// display the menu
@@ -92,6 +97,7 @@ int8_t TFT_MENU::show(MENU menu[], int8_t active = 1)
 
 	do
 	{
+		joystick->loop();
 		if (current != lCurrent || first != lfirst)
 		{								   // if current or first has changed draw the menu
 			tft->setCursor(0, fontHeight); // skip the first display line (the title)
@@ -104,13 +110,15 @@ int8_t TFT_MENU::show(MENU menu[], int8_t active = 1)
 				{
 					if (j == current)
 					{
-						tft->setTextColor(sF, sB);
+            Serial.println("X:"+String(tft->getCursorX())+" Y:"+String(tft->getCursorY())+" C:"+String(current));
+						tft->setTextColor(sF, sB,true);
 						tft->print(F(">"));
-						tft->setTextColor(nF, nB);
+						tft->setTextColor(nF, nB,true);
 						tft->print(menu[j].option);
 					}
 					else
 					{
+            tft->setTextColor(nF, nB,true);
 						printSpaces(1);
 						tft->print(menu[j].option);
 					}
@@ -120,32 +128,28 @@ int8_t TFT_MENU::show(MENU menu[], int8_t active = 1)
 				}
 			}
 		}
+		if (joystick->isUp()) {
+	 		if (current > 1)
+	 		{
+	 			current--;
+	 			if (current < first)
+	 				first--;
+	 		}
 
-		switch (joystick->getValue())
-		{
-		case 0:
-			// button = encoder->getButton();
-			if (joystick->isButtonPressed())
-				again = false;
-			break;
+		}
+		if (joystick->isDown()) {
+	 		if (current < menuCount - 1)
+	 		{
+	 			current++;
+	 			if (current > maxLines - 1)
+	 				first = current - maxLines + 2;
+	 		}
 
-		case 1:
-			if (current > 1)
-			{
-				current--;
-				if (current < first)
-					first--;
-			}
-			break;
-
-		case -1:
-			if (current < menuCount - 1)
-			{
-				current++;
-				if (current > maxLines - 1)
-					first = current - maxLines + 2;
-			}
-			break;
+		}
+		if (joystick->isRight() && (joystick->getX()>50)) {
+      Serial.println("X : " + String(joystick->getX()));
+      Serial.println("Y : " +String(joystick->getY()));
+			again = false;
 		}
 	} while (again);
 
@@ -182,16 +186,89 @@ void TFT_MENU::setColors(
 
 void TFT_MENU::printSpaces(int8_t spaces)
 {
+  
 	if (spaces > 0)
 		for (int i = 0; i < spaces; i++)
 			tft->print(F(" "));
 }
 
-TFT_File::TFT_File(TFT_eSPI &tfts, AnalogJoystick &joystick, uint8_t textSize):TFT_MENU(tfts,joystick,textSize)
+TFT_File::TFT_File(TFT_eSPI &tfts, Joystick &joystick, uint8_t textSize,String fileFilter)
+	:TFT_MENU(tfts,joystick,textSize)
 {
+  strFilter = fileFilter;
+  items.clear();
+  readFiles();
 }
 
 int8_t TFT_File::show(int8_t active)
 {
-    return 0;
+  int8_t result = TFT_MENU::show(items.data(),active);
+  _selectedFile = items.at(result).option;
+  return result;
+}
+
+void TFT_File::setFilter(String filter)
+{
+  strFilter = filter;
+  refresh();
+}
+
+void TFT_File::refresh()
+{
+  items.clear();
+  readFiles();
+}
+
+String TFT_File::getSelectedFilename()
+{
+  return _selectedFile;
+}
+
+void TFT_File::setShowDir(bool flag)
+{
+  _showDir = flag;
+}
+
+bool TFT_File::getShowDir()
+{
+  return _showDir;
+}
+
+void TFT_File::readFiles()
+{
+	fs::File dir,file;
+  dir = FFat.open("/");
+  int cnt = 0;
+  items.push_back((MENU){"Flash tartalom:",cnt++});
+  if (dir.isDirectory())
+  {
+    Serial.println();
+    Serial.println(dir.name());
+    file = dir.openNextFile();
+    while(file) {
+      if (file) {
+        String fname = file.name();
+        if ((strFilter!=".*") && fname.endsWith(strFilter)) {
+          if (!file.isDirectory()) {
+            items.push_back((MENU){fname,cnt++});
+          } else
+          {
+            items.push_back((MENU){_dChars[0]+fname+_dChars[1],cnt++});
+          }
+          
+        } else if (strFilter == ".*")
+        {
+          if (!file.isDirectory()) {
+            items.push_back((MENU){fname,cnt++});
+          } else
+          {
+            items.push_back((MENU){_dChars[0]+fname+_dChars[1],cnt++});
+          }
+        }
+      }
+      file = dir.openNextFile();
+    }
+  }
+  dir.close();
+  items.push_back((MENU){"",0});
 }

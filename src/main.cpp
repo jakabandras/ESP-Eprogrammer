@@ -15,15 +15,15 @@
 #include <menuIO/TFT_eSPIOut.h>
 #include <menuIO/analogAxisIn.h>
 #include <menuIO/AltkeyIn.h>
-//#include <menuIO/clickEncoderIn.h>
 #include <menuIO/serialOut.h>
 #include <menuIO/serialIn.h>
 #include <menuIO/chainStream.h>
 #include <plugin/SdFatMenu.h>
 #include <TFT_eFEX.h>   // Include the extension graphics functions library
 //#include <AnalogJoystick.h>
+#include <JoystickLib.h>
 #include "TFT_Menu.h"
-//#include "filemenu.h"
+
 struct  Config {
   char ssid[20];
   char pass[20];
@@ -96,12 +96,16 @@ void saveConfig();
 int sendAddress(uint16_t address);
 void getFile(String fname, uint32_t fsize);
 void fillItems();
+void onJoyUP();
+void onJoyDown();
+void onJoyRight();
 
 analogAxis<JOY_Y,10,false> ay;
 
 #define joyBtn 12
 
-AnalogJoystick mJoy(JOY_X,JOY_Y,joyBtn,2250);
+//AnalogJoystick mJoy(JOY_X,JOY_Y,joyBtn,2250);
+Joystick stick(JOY_X,JOY_Y);
 
 keyMap btnsMap[]={{-joyBtn,defaultNavCodes[enterCmd].ch}};//negative pin numbers use internal pull-up, this is on when low
 keyIn<1> btns(btnsMap);// 1 is the number of keys
@@ -124,7 +128,7 @@ char ipaddr[47] = "                                              ";
 int fileStorage = 0;
 Config Myconfig;
 WiFiUDP udp;
-TFT_MENU xMenu(tft,mJoy,1);
+//TFT_MENU xMenu(tft,mJoy,1);
 std::vector<MENU> xMenuItems;
 
 String fonts[30] = {
@@ -339,6 +343,9 @@ void setup() {
     delay(100);
   }
   ay.setCalibration(iKalVal / 50);
+  stick.calibrate();
+  stick.setThreshold(1000,3500,1000,3500);
+  
   linePrint("Kész");
   if(!FFat.begin()){
     linePrint("FFat csatolása sikertelen");
@@ -603,15 +610,13 @@ result actLoadSettings(eventMask e,prompt& item) {
 
 result idleListFiles(menuOut& o,idleEvent e) {
   if (e==idling) {
-    MENU mymenu[] = {
-      {"Teszt Menü :",           0 },
-      {"Teszt 1",                1 },
-      {"Teszt 2",                2 },
-      {"Valami",                 3 }
-    };
-    TFT_MENU menu(tft,mJoy,1);
-    int mm = menu.show(mymenu,1);
-    o.println(mymenu[mm].option);
+    stick.clearCallbacks();
+    TFT_File menu(tft,stick,1,".bmp");
+    int mm = menu.show(1);
+    o.println(menu.getSelectedFilename());
+    stick.onDown(onJoyDown);
+    stick.onUp(onJoyUP);
+    stick.onRight(onJoyRight);
   }
   return proceed;
 }
@@ -1445,4 +1450,19 @@ result actScreenTest(eventMask e, navNode& nav, prompt& item) {
   }
   f.flush();
   f.close();
+ }
+
+ void onJoyUP()
+ {
+  nav.doNav(Menu::navCmds::upCmd);
+ }
+
+ void onJoyDown()
+ {
+  nav.doNav(Menu::navCmds::downCmd);
+ }
+
+ void onJoyRight()
+ {
+  nav.doNav(Menu::navCmds::enterCmd);
  }

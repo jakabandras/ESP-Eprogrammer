@@ -1,3 +1,4 @@
+#include <Arduino.h>
 #include "AnalogJoystick.h"
 
 AnalogJoystick::AnalogJoystick(int xpin, int ypin, int bpin, int calValue) {

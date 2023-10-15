@@ -28,7 +28,7 @@
 #define __TFT_MENU_H__
 #include <vector>
 #include <TFT_eSPI.h>
-#include <AnalogJoystick.h>
+#include <JoystickLib.h>
 ///////////////////////////////////////////////////////////////////////////
 //
 // The R & B color bits are reversed on my ebay green tag display
@@ -71,9 +71,9 @@ typedef struct _MENU
 class TFT_MENU
 {
 public:
-	TFT_MENU(TFT_eSPI &tft, AnalogJoystick &joystick, uint8_t textSize = 1);
+	TFT_MENU(TFT_eSPI &tft, Joystick &joystick, uint8_t textSize = 1);
 
-	int8_t show(MENU menu[], int8_t active);
+	int8_t show(MENU menu[], int8_t active =1);
 
 	void setColors(
 		uint16_t headerForground,
@@ -86,7 +86,7 @@ public:
 private:
 	void printSpaces(int8_t spaces = 1);
 	TFT_eSPI *tft;
-	AnalogJoystick *joystick;
+	Joystick *joystick;
 	int font;
 	int16_t fontHeight;
 	int16_t fontWidth;
@@ -94,7 +94,7 @@ private:
 	uint8_t maxLines;
 
 	uint16_t hF = TFT_BLUE;
-	uint16_t hB = TFT_WHITE;
+	uint16_t hB = TFT_YELLOW;
 	uint16_t nF = TFT_WHITE;
 	uint16_t nB = TFT_BLUE;
 	uint16_t sF = TFT_WHITE;
@@ -105,12 +105,21 @@ private:
 class TFT_File : public TFT_MENU
 {
 public:
-  TFT_File(TFT_eSPI &tft, AnalogJoystick &joystick, uint8_t textSize = 1);
+  TFT_File(TFT_eSPI &tft, Joystick &joystick, uint8_t textSize = 1,String fileFilter = ".*");
 	int8_t show(int8_t active);
   void setFilter(String filter);
   void refresh();
+  String getSelectedFilename();
+  void setShowDir(bool flag);
+  bool getShowDir();
 private:
-	std::vector<String> items;
+	std::vector<MENU> items;
+	String strFilter = ".*";
+	String _selectedFile = "";
+	bool _showDir = true;
+	String _dChars[2] = {"[","]"};
+
+	void readFiles();
 };
 
 
