@@ -14,7 +14,7 @@
 #include <menuIO/adafruitGfxOut.h>
 #include <menuIO/TFT_eSPIOut.h>
 #include <menuIO/analogAxisIn.h>
-#include <menuIO/AltkeyIn.h>
+#include <menuIO/keyIn.h>
 #include <menuIO/serialOut.h>
 #include <menuIO/serialIn.h>
 #include <menuIO/chainStream.h>
@@ -89,16 +89,17 @@ result actChangeScale(eventMask e,navNode& nav ,prompt& item);
 result actListSettings(eventMask e, navNode& nav, prompt& item);
 result actScreenTest(eventMask e, navNode& nav, prompt& item);
 result actSplash(eventMask e, navNode& nav, prompt& item);
+result actTestButton(eventMask e, navNode& nav, prompt& item);
 void setDefConfig();
 void timerIsr();
 void parseCommand(char *command, IPAddress remoteIP, uint16_t remotePort);
 void saveConfig();
 int sendAddress(uint16_t address);
 void getFile(String fname, uint32_t fsize);
-void fillItems();
 void onJoyUP();
 void onJoyDown();
 void onJoyRight();
+std::vector<String> bytes2hexStrin(byte[] buff, uint32_t len);
 
 analogAxis<JOY_Y,10,false> ay;
 
@@ -245,6 +246,7 @@ MENU(mnuScreen,"Kijelző beállítása",doNothing,noEvent,noStyle
   ,SUBMENU(mnuFont)
   ,SUBMENU(mnuScrTajol)
   ,FIELD(Myconfig.scale,"Kijelző mérete :","",1,3,0.1,1,actChangeScale,exitEvent,noStyle)
+  ,OP("Splash képernyő",actSplash,enterEvent)
   ,OP("Kijelző teszt",actScreenTest,enterEvent)
   ,OP("Kijelző beállítása",doNothing,enterEvent)
   ,EXIT("<Vissza")
@@ -263,6 +265,7 @@ MENU(mnuMySettings,"Beállítások",doNothing,noEvent,noStyle
   ,SUBMENU(mnuConnections)
   ,SUBMENU(mnuStorage)
   ,SUBMENU(mnuScreen)
+  ,OP("Button teszt",actTestButton,enterEvent)
   ,OP("Beállítások mentése",actSaveSettings,enterEvent)
   ,OP("Beállítások betöltése",actLoadSettings,enterEvent)
   ,OP("Beállitások alaphelyzetbe állítása",doNothing,enterEvent)
@@ -332,6 +335,7 @@ void charPrint(const char *text) {
 void setup() {
   Serial.begin(115200);
   while(!Serial);
+  pinMode(JOY_BTN,INPUT_PULLUP);
   tft.begin();
   tft.fillScreen(TFT_BLACK);
   linePrint("ESP32 Eprom programmer");
@@ -458,11 +462,6 @@ void loop() {
   IPAddress remoteIP;
   uint16_t remotePort;
   nav.poll();
-  int kp = digitalRead(joyBtn);
-  if (kp) Serial.println("KKKKKK");
-  #ifdef ESP8266
-  //digitalWrite(LEDPIN, ledCtrl);
-  #endif
   if (Myconfig.conType == 0) {
     int packetSize = udp.parsePacket();
     if (packetSize) {
@@ -608,10 +607,43 @@ result actLoadSettings(eventMask e,prompt& item) {
   return proceed;
 }
 
+result actSplash(eventMask e, navNode& nav, prompt& item) {
+  //Ez még csak teszt, később meg kell írni....
+  String spName;
+  TFT_File menu(tft,stick,1,".bmp");
+  int selFile = menu.show(1);
+  spName = "/"+menu.getSelectedFilename();
+  fex.drawBmp(FFat,spName,0,0);
+  delay(5000);
+  tft.fillScreen(TFT_BLACK);
+  //Myconfig.splash = spName;
+  //saveConfig();
+  nav.reset();
+  return proceed;
+}
+
+result actTestButton(eventMask e, navNode &nav, prompt &item)
+{
+  pinMode(JOY_BTN,INPUT_PULLUP);
+  tft.fillScreen(TFT_DARKCYAN);
+  tft.setCursor(0,0);
+  tft.setTextColor(TFT_BLACK);
+  for(int i=0;i<1000;i++) {
+    uint16_t btn = digitalRead(JOY_BTN);
+    if (btn) {
+      tft.print("1");
+    } else {
+      tft.print("0");
+    }
+    delay(500);
+  }
+  return proceed;
+}
+
 result idleListFiles(menuOut& o,idleEvent e) {
   if (e==idling) {
     stick.clearCallbacks();
-    TFT_File menu(tft,stick,1,".bmp");
+    TFT_File menu(tft,stick,1,".*");
     int mm = menu.show(1);
     o.println(menu.getSelectedFilename());
     stick.onDown(onJoyDown);
@@ -1096,13 +1128,6 @@ result actListSettings(eventMask e, navNode& nav, prompt& item) {
   return proceed;
 }
 
-result actSplash(eventMask e, navNode& nav, prompt& item) {
-  //Ez még csak teszt, később meg kell írni....
-  fex.drawBmp(FFat,"/Betti2.bmp",0,0);
-  delayMicroseconds(5000);
-  nav.reset();
-  return proceed;
-}
 
 
 unsigned long testFillScreen() {

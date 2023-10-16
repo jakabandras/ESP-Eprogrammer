@@ -21,9 +21,7 @@ TFT_MENU::TFT_MENU(TFT_eSPI &tfts, Joystick &joystick, uint8_t textSize)
 	fontHeight = 14;
 	fontWidth = 8;
 	maxChars = tft->width() / fontWidth;
-  Serial.println("Max. karakter: "+String(maxChars));
 	maxLines = tft->height() / fontHeight;
-  Serial.println("Max. sor: "+String(maxLines));
 }
 
 ///////////////////////////////////////////////////////////////////////////
@@ -110,7 +108,6 @@ int8_t TFT_MENU::show(MENU menu[], int8_t active)
 				{
 					if (j == current)
 					{
-            Serial.println("X:"+String(tft->getCursorX())+" Y:"+String(tft->getCursorY())+" C:"+String(current));
 						tft->setTextColor(sF, sB,true);
 						tft->print(F(">"));
 						tft->setTextColor(nF, nB,true);
@@ -146,9 +143,7 @@ int8_t TFT_MENU::show(MENU menu[], int8_t active)
 	 		}
 
 		}
-		if (joystick->isRight() && (joystick->getX()>50)) {
-      Serial.println("X : " + String(joystick->getX()));
-      Serial.println("Y : " +String(joystick->getY()));
+		if (joystick->isRight() && (joystick->getX()>30)) {
 			again = false;
 		}
 	} while (again);
@@ -242,8 +237,6 @@ void TFT_File::readFiles()
   items.push_back((MENU){"Flash tartalom:",cnt++});
   if (dir.isDirectory())
   {
-    Serial.println();
-    Serial.println(dir.name());
     file = dir.openNextFile();
     while(file) {
       if (file) {
