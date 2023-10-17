@@ -13,7 +13,6 @@
 //	textSize:	Size of text to use for the menu, defaults to 1
 //
 ///////////////////////////////////////////////////////////////////////////
-
 TFT_MENU::TFT_MENU(TFT_eSPI &tfts, Joystick &joystick, uint8_t textSize)
 {
 	this->tft = &tfts;
@@ -163,7 +162,6 @@ void TFT_MENU::setButton(uint8_t bPin)
 //	setColors: Set the text colors used by the menu
 //
 ///////////////////////////////////////////////////////////////////////////
-
 void TFT_MENU::setColors(
 	uint16_t headerForground,
 	uint16_t headerBackground,
@@ -185,7 +183,6 @@ void TFT_MENU::setColors(
 //	printSpaces: Prints spaces on TFT, used to clear to the end of the line
 //
 ///////////////////////////////////////////////////////////////////////////
-
 void TFT_MENU::printSpaces(int8_t spaces)
 {
   

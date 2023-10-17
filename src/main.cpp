@@ -18,7 +18,6 @@
 #include <menuIO/serialOut.h>
 #include <menuIO/serialIn.h>
 #include <menuIO/chainStream.h>
-#include <plugin/SdFatMenu.h>
 #include <TFT_eFEX.h>   // Include the extension graphics functions library
 //#include <AnalogJoystick.h>
 #include <JoystickLib.h>
@@ -36,7 +35,7 @@ struct  Config {
   int scrTajol=0;
   float scale = 1.5;
   int splash = 1;
-  int showBoot;
+  int showBoot = 1;
   String spFile;
 };
 
@@ -83,7 +82,6 @@ result actSaveSettings(eventMask e, prompt& item);
 result actLoadSettings(eventMask e, prompt& item);
 result actListFiles(eventMask e, prompt& item);
 result actHttpConnect(eventMask e, prompt &item);
-result filePick(eventMask event, navNode& nav, prompt &item);
 result actRestart(eventMask e, prompt& item);
 result actFontChange(eventMask e,navNode& nav ,prompt& item);
 result actScrTajol(eventMask e,navNode& nav ,prompt& item);
@@ -101,7 +99,7 @@ void getFile(String fname, uint32_t fsize);
 void onJoyUP();
 void onJoyDown();
 void onJoyRight();
-std::vector<String> bytes2hexStrin(byte[] buff, uint32_t len);
+std::vector<String> bytes2hexStrin(byte buff[], uint32_t len);
 
 analogAxis<JOY_Y,10,false> ay;
 
@@ -152,7 +150,6 @@ String bitmaps[50] = {
 
 
 
-SDMenuT<CachedFSO<fs::F_Fat,32>> filePickMenu(FFat,"FFAT partíció","/",filePick,enterEvent);
 
 // Menük
 SELECT(selRomType,mnuRomtype,"Rom típus :",doNothing,noEvent,noStyle
@@ -203,7 +200,6 @@ MENU(mnuEprom,"EPROM műveletek",doNothing,noEvent,noStyle
 
 MENU(mnuFile,"Fájl műveletek",doNothing,noEvent,noStyle
   ,OP("Fájlok listázása",actListFiles,enterEvent)
-  ,SUBMENU(filePickMenu)
   ,OP("Fájl törlése",doNothing,enterEvent)
   ,OP("Fájl átnevezése",doNothing,enterEvent)
   ,OP("Fájl küldése",doNothing,enterEvent)
@@ -376,7 +372,6 @@ void setup() {
     if (!configFile) {
       linePrint("Nem sikerült megnyitni a konfigurációs fájlt írásra");
     }
-    filePickMenu.begin();
     StaticJsonDocument<512> doc;
     doc["ssid"] = Myconfig.ssid;
     doc["pass"] = Myconfig.pass;
@@ -414,7 +409,7 @@ void setup() {
       Myconfig.scrTajol = doc["scrTajol"];
       Myconfig.splash = doc["splash"];
       Myconfig.showBoot = doc["showBoot"];
-      Myconfig.spFile = doc["spFile"];
+      Myconfig.spFile = doc["spFile"].as<String>();
     }
   }
   linePrint("Konfigurációs fájl beolvasva");
@@ -753,20 +748,6 @@ result idleHttpConnect(menuOut& o,idleEvent e) {
   return proceed;
 }
 
-result filePick(eventMask event, navNode& nav, prompt &item) {
-  // switch(event) {//for now events are filtered only for enter, so we dont need this checking
-  //   case enterCmd:
-      if (nav.root->navFocus==(navTarget*)&filePickMenu) {
-        Serial.println();
-        Serial.print("selected file:");
-        Serial.println(filePickMenu.selectedFile);
-        Serial.print("from folder:");
-        Serial.println(filePickMenu.selectedFolder);
-      }
-  //     break;
-  // }
-  return proceed;
-}
 
 /***************************************************************************************
 ** Function name:           parseCommand
@@ -1512,16 +1493,18 @@ result actScreenTest(eventMask e, navNode& nav, prompt& item) {
   nav.doNav(Menu::navCmds::enterCmd);
  }
 
- std::vector<String> bytes2hexStrin(byte[] buff, uint32_t len)
+ std::vector<String> bytes2hexStrin(byte buff[], uint32_t len)
  {
   std::vector<String> strBuff;
   byte tmpBuffer[8];
   uint32_t bPtr =0;
   String tmp;
   while(bPtr+8<=len) {
-    sprintf(tmp,"%0X %0X %0X %0X %0X %0X %0X %0X"
+    char bff[100];
+    sprintf(bff,"%0X %0X %0X %0X %0X %0X %0X %0X"
       ,buff[bPtr],buff[bPtr+1],buff[bPtr+2],buff[bPtr+3],buff[bPtr+4],buff[bPtr+5]
       ,buff[bPtr+6],buff[bPtr]+7);
+    tmp = String(bff);
     strBuff.push_back(tmp);
     bPtr += 8;
   }
@@ -1529,7 +1512,7 @@ result actScreenTest(eventMask e, navNode& nav, prompt& item) {
   tmp = "";
   for (size_t i = 0; i < marad; i++)
   {
-    String t1;
+    char t1[50];
     sprintf(t1,"%0X",buff[bPtr+i]);
     if (tmp.isEmpty()) {
       tmp = t1;
