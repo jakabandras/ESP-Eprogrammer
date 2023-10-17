@@ -44,7 +44,6 @@ TFT_MENU::TFT_MENU(TFT_eSPI &tfts, Joystick &joystick, uint8_t textSize)
 //		use getButton to determine how the button was clicked.
 //
 ///////////////////////////////////////////////////////////////////////////
-
 int8_t TFT_MENU::show(MENU menu[], int8_t active)
 {
 
@@ -146,9 +145,17 @@ int8_t TFT_MENU::show(MENU menu[], int8_t active)
 		if (joystick->isRight() && (joystick->getX()>30)) {
 			again = false;
 		}
+    int state = digitalRead(_ButtonPin);
+    if (!state) again= false;
 	} while (again);
 
 	return menu[current].value;
+}
+
+void TFT_MENU::setButton(uint8_t bPin)
+{
+  _ButtonPin = bPin;
+  pinMode(_ButtonPin,INPUT_PULLUP);
 }
 
 ///////////////////////////////////////////////////////////////////////////

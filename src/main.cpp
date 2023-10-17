@@ -35,7 +35,9 @@ struct  Config {
   int scrFont;
   int scrTajol=0;
   float scale = 1.5;
-  int splash = 0;
+  int splash = 1;
+  int showBoot;
+  String spFile;
 };
 
 
@@ -236,9 +238,19 @@ SELECT(Myconfig.scrTajol,mnuScrTajol,"Kijelző tájolása :",actScrTajol,exitEve
   ,VALUE("Vízszintes tükrözve",3,doNothing,noEvent)
 );
 
-SELECT(Myconfig.splash,mnuSplash,"Bejelentkező kép",actSplash,exitEvent,noStyle
-  ,VALUE("Betti2.bmp",0,doNothing,noEvent)
-  ,VALUE("Betti3.bmp",1,doNothing,noEvent)
+SELECT(Myconfig.splash,mnuSplash,"Bejelentkező kép",doNothing,noEvent,noStyle
+  ,VALUE("Bekapcsolva",1,doNothing,noEvent)
+  ,VALUE("Kikapcsolva",0,doNothing,noEvent)
+);
+
+SELECT(Myconfig.showBoot,mnuBootProcess,"Betöltési folyamat",doNothing,noEvent,noStyle
+  ,VALUE("Bekapcsolva",1,doNothing,noEvent)
+  ,VALUE("Kikapcsolva",0,doNothing,noEvent)
+);
+
+MENU(mnuBoot,"Betöltési folyamat",doNothing,noEvent,noStyle
+  ,SUBMENU(mnuSplash)
+  ,OP("Splash képernyő",actSplash,enterEvent)
 );
 
 //Kijelző beállítása menü
@@ -246,7 +258,7 @@ MENU(mnuScreen,"Kijelző beállítása",doNothing,noEvent,noStyle
   ,SUBMENU(mnuFont)
   ,SUBMENU(mnuScrTajol)
   ,FIELD(Myconfig.scale,"Kijelző mérete :","",1,3,0.1,1,actChangeScale,exitEvent,noStyle)
-  ,OP("Splash képernyő",actSplash,enterEvent)
+  ,SUBMENU(mnuBoot)
   ,OP("Kijelző teszt",actScreenTest,enterEvent)
   ,OP("Kijelző beállítása",doNothing,enterEvent)
   ,EXIT("<Vissza")
@@ -318,17 +330,17 @@ void formatFFat() {
 
 void linePrint(const char *text) {
   Serial.println(text);
-  tft.println(text);
+  if (Myconfig.showBoot) tft.println(text);
 }
 
 void linePrint(const String text) {
   Serial.println(text);
-  tft.println(text);
+  if (Myconfig.showBoot) tft.println(text);
 }
 
 void charPrint(const char *text) {
   Serial.print(text);
-  tft.print(text);
+  if (Myconfig.showBoot) tft.print(text);
 }
 
 
@@ -375,6 +387,8 @@ void setup() {
     doc["scrFont"] = Myconfig.scrFont;
     doc["scrTajol"] = Myconfig.scrTajol;
     doc["splash"] = Myconfig.splash;
+    doc["showBoot"] = Myconfig.showBoot;
+    doc["spFile"] = Myconfig.spFile;
     serializeJson(doc, configFile);
     configFile.close();
   } else {
@@ -399,6 +413,8 @@ void setup() {
       selFont = Myconfig.scrFont;
       Myconfig.scrTajol = doc["scrTajol"];
       Myconfig.splash = doc["splash"];
+      Myconfig.showBoot = doc["showBoot"];
+      Myconfig.spFile = doc["spFile"];
     }
   }
   linePrint("Konfigurációs fájl beolvasva");
@@ -720,7 +736,9 @@ void setDefConfig() {
   Myconfig.scrFont = 0;
   Myconfig.scrTajol = 0;
   Myconfig.scale = 1.5;
-  Myconfig.splash = 0;
+  Myconfig.splash = 1;
+  Myconfig.showBoot = 1;
+  Myconfig.spFile ="/Betti2.bmp";
 }
 
 //TODO: HTTP kapcsolat megírása
@@ -1059,6 +1077,8 @@ void saveConfig() {
   doc["scrTajol"] = Myconfig.scrTajol;
   doc["scale"] = Myconfig.scale;
   doc["splash"] = Myconfig.splash;
+  doc["showBoot"] = Myconfig.showBoot;
+  doc["spFile"] = Myconfig.spFile;
   serializeJson(doc, configFile);
   configFile.close();
 }
@@ -1490,4 +1510,33 @@ result actScreenTest(eventMask e, navNode& nav, prompt& item) {
  void onJoyRight()
  {
   nav.doNav(Menu::navCmds::enterCmd);
+ }
+
+ std::vector<String> bytes2hexStrin(byte[] buff, uint32_t len)
+ {
+  std::vector<String> strBuff;
+  byte tmpBuffer[8];
+  uint32_t bPtr =0;
+  String tmp;
+  while(bPtr+8<=len) {
+    sprintf(tmp,"%0X %0X %0X %0X %0X %0X %0X %0X"
+      ,buff[bPtr],buff[bPtr+1],buff[bPtr+2],buff[bPtr+3],buff[bPtr+4],buff[bPtr+5]
+      ,buff[bPtr+6],buff[bPtr]+7);
+    strBuff.push_back(tmp);
+    bPtr += 8;
+  }
+  uint32_t marad = len-bPtr;
+  tmp = "";
+  for (size_t i = 0; i < marad; i++)
+  {
+    String t1;
+    sprintf(t1,"%0X",buff[bPtr+i]);
+    if (tmp.isEmpty()) {
+      tmp = t1;
+    } else {
+      tmp = tmp + " " + t1;
+    }
+  }
+  strBuff.push_back(tmp);
+  return strBuff;
  }

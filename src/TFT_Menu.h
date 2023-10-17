@@ -36,11 +36,11 @@
 //
 ///////////////////////////////////////////////////////////////////////////
 #ifndef TFT_BLACK
-#define TFT_BLACK 0x0000 /*   0,   0,   0 */
-#define TFT_RED 0x001F	 /*   0,   0, 255 */
-#define TFT_GREEN 0x07E0 /*   0, 255,   0 */
-#define TFT_BLUE 0xF800	 /* 255,   0,   0 */
-#define TFT_WHITE 0xFFFF /* 255, 255, 255 */
+  #define TFT_BLACK 0x0000 /*   0,   0,   0 */
+  #define TFT_RED 0x001F	 /*   0,   0, 255 */
+  #define TFT_GREEN 0x07E0 /*   0, 255,   0 */
+  #define TFT_BLUE 0xF800	 /* 255,   0,   0 */
+  #define TFT_WHITE 0xFFFF /* 255, 255, 255 */
 #endif					 // !TFT_BLACK
 
 ///////////////////////////////////////////////////////////////////////////
@@ -54,7 +54,6 @@
 //		using the __FlashStringHelper
 //
 ///////////////////////////////////////////////////////////////////////////
-
 typedef struct _MENU
 {
 	String option;
@@ -67,60 +66,60 @@ typedef struct _MENU
 //	TFT_MENU Class to display a simple menu on a TFT display
 //
 ///////////////////////////////////////////////////////////////////////////
-
 class TFT_MENU
 {
 public:
 	TFT_MENU(TFT_eSPI &tft, Joystick &joystick, uint8_t textSize = 1);
 
-	int8_t show(MENU menu[], int8_t active =1);
-
+	int8_t show(MENU menu[], int8_t active = 1);
+  void setButton(uint8_t bPin);
 	void setColors(
-		uint16_t headerForground,
-		uint16_t headerBackground,
-		uint16_t normalForeground,
-		uint16_t normalBackground,
-		uint16_t selectedForgound,
-		uint16_t selectedBackground);
+		uint16_t headerForground,     //Fejléc szöveg színe
+		uint16_t headerBackground,    //Fejléc háttér színe
+		uint16_t normalForeground,    //Normál szöveg színe
+		uint16_t normalBackground,    //Normál szöveg háttér színe
+		uint16_t selectedForgound,    //Kiválasztott szöveg színe
+		uint16_t selectedBackground   //Kiválasztott szöveg háttér színe
+    );
 
 private:
 	void printSpaces(int8_t spaces = 1);
 	TFT_eSPI *tft;
 	Joystick *joystick;
+	int8_t _ButtonPin = 0;
 	int font;
 	int16_t fontHeight;
 	int16_t fontWidth;
 	uint8_t maxChars;
 	uint8_t maxLines;
 
-	uint16_t hF = TFT_BLUE;
-	uint16_t hB = TFT_YELLOW;
-	uint16_t nF = TFT_WHITE;
-	uint16_t nB = TFT_BLUE;
-	uint16_t sF = TFT_WHITE;
-	uint16_t sB = TFT_RED;
-
+	uint16_t hF = TFT_BLUE;     //Fejléc szöveg színe
+	uint16_t hB = TFT_YELLOW;   //Fejléc háttér színe
+	uint16_t nF = TFT_WHITE;    //Normál szöveg színe
+	uint16_t nB = TFT_BLUE;     //Normál szöveg háttér színe
+	uint16_t sF = TFT_WHITE;    //Kiválasztott szöveg színe
+	uint16_t sB = TFT_RED;      //Kiválasztott szöveg háttér színe
 };
 
 class TFT_File : public TFT_MENU
 {
 public:
-  TFT_File(TFT_eSPI &tft, Joystick &joystick, uint8_t textSize = 1,String fileFilter = ".*");
+	TFT_File(TFT_eSPI &tft, Joystick &joystick, uint8_t textSize = 1, String fileFilter = ".*");
 	int8_t show(int8_t active);
-  void setFilter(String filter);
-  void refresh();
-  String getSelectedFilename();
-  void setShowDir(bool flag);
-  bool getShowDir();
+	void setFilter(String filter);
+	void refresh();
+	String getSelectedFilename();
+	void setShowDir(bool flag);
+	bool getShowDir();
+
 private:
 	std::vector<MENU> items;
 	String strFilter = ".*";
 	String _selectedFile = "";
 	bool _showDir = true;
-	String _dChars[2] = {"[","]"};
+	String _dChars[2] = {"[", "]"};
 
 	void readFiles();
 };
-
 
 #endif // __TFT_MENU_H__
