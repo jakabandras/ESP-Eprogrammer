@@ -27,6 +27,7 @@
 #ifndef __TFT_MENU_H__
 #define __TFT_MENU_H__
 #include <vector>
+#include <regex>
 #include <TFT_eSPI.h>
 #include <JoystickLib.h>
 ///////////////////////////////////////////////////////////////////////////
@@ -36,12 +37,12 @@
 //
 ///////////////////////////////////////////////////////////////////////////
 #ifndef TFT_BLACK
-  #define TFT_BLACK 0x0000 /*   0,   0,   0 */
-  #define TFT_RED 0x001F	 /*   0,   0, 255 */
-  #define TFT_GREEN 0x07E0 /*   0, 255,   0 */
-  #define TFT_BLUE 0xF800	 /* 255,   0,   0 */
-  #define TFT_WHITE 0xFFFF /* 255, 255, 255 */
-#endif					 // !TFT_BLACK
+#define TFT_BLACK 0x0000 /*   0,   0,   0 */
+#define TFT_RED 0x001F	 /*   0,   0, 255 */
+#define TFT_GREEN 0x07E0 /*   0, 255,   0 */
+#define TFT_BLUE 0xF800	 /* 255,   0,   0 */
+#define TFT_WHITE 0xFFFF /* 255, 255, 255 */
+#endif									 // !TFT_BLACK
 
 ///////////////////////////////////////////////////////////////////////////
 //
@@ -72,15 +73,15 @@ public:
 	TFT_MENU(TFT_eSPI &tft, Joystick &joystick, uint8_t textSize = 1);
 
 	int8_t show(MENU menu[], int8_t active = 1);
-  void setButton(uint8_t bPin);
+	void setButton(uint8_t bPin);
 	void setColors(
-		uint16_t headerForground,     //Fejléc szöveg színe
-		uint16_t headerBackground,    //Fejléc háttér színe
-		uint16_t normalForeground,    //Normál szöveg színe
-		uint16_t normalBackground,    //Normál szöveg háttér színe
-		uint16_t selectedForgound,    //Kiválasztott szöveg színe
-		uint16_t selectedBackground   //Kiválasztott szöveg háttér színe
-    );
+			uint16_t headerForground,		// Fejléc szöveg színe
+			uint16_t headerBackground,	// Fejléc háttér színe
+			uint16_t normalForeground,	// Normál szöveg színe
+			uint16_t normalBackground,	// Normál szöveg háttér színe
+			uint16_t selectedForgound,	// Kiválasztott szöveg színe
+			uint16_t selectedBackground // Kiválasztott szöveg háttér színe
+	);
 
 private:
 	void printSpaces(int8_t spaces = 1);
@@ -93,33 +94,48 @@ private:
 	uint8_t maxChars;
 	uint8_t maxLines;
 
-	uint16_t hF = TFT_BLUE;     //Fejléc szöveg színe
-	uint16_t hB = TFT_YELLOW;   //Fejléc háttér színe
-	uint16_t nF = TFT_WHITE;    //Normál szöveg színe
-	uint16_t nB = TFT_BLUE;     //Normál szöveg háttér színe
-	uint16_t sF = TFT_WHITE;    //Kiválasztott szöveg színe
-	uint16_t sB = TFT_RED;      //Kiválasztott szöveg háttér színe
+	uint16_t hF = TFT_BLUE;		// Fejléc szöveg színe
+	uint16_t hB = TFT_YELLOW; // Fejléc háttér színe
+	uint16_t nF = TFT_WHITE;	// Normál szöveg színe
+	uint16_t nB = TFT_BLUE;		// Normál szöveg háttér színe
+	uint16_t sF = TFT_WHITE;	// Kiválasztott szöveg színe
+	uint16_t sB = TFT_RED;		// Kiválasztott szöveg háttér színe
 };
 
 class TFT_File : public TFT_MENU
 {
 public:
-	TFT_File(TFT_eSPI &tft, Joystick &joystick, uint8_t textSize = 1, String fileFilter = ".*");
+	TFT_File(TFT_eSPI &tft, Joystick &joystick, uint8_t textSize = 1, String fileFilter = ".*", String getDir = "/");
 	int8_t show(int8_t active);
 	void setFilter(String filter);
 	void refresh();
 	String getSelectedFilename();
 	void setShowDir(bool flag);
 	bool getShowDir();
+	void setActDir(String actdir);
+	void resetDir();
+	String showFiles(MENU menu[], int8_t active = 1);
 
 private:
 	std::vector<MENU> items;
 	String strFilter = ".*";
 	String _selectedFile = "";
 	bool _showDir = true;
+	String actDir = "/";
 	String _dChars[2] = {"[", "]"};
+	std::vector<String> dirHistory;
 
 	void readFiles();
+	void processDir(String getDir);
 };
+
+template <typename OutputIterator>
+void string_split(std::string const &s, char sep, OutputIterator output, bool skip_empty = true)
+{
+	std::regex rxSplit(std::string("\\") + sep + (skip_empty ? "+" : ""));
+
+	std::copy(std::sregex_token_iterator(std::begin(s), std::end(s), rxSplit, -1),
+						std::sregex_token_iterator(), output);
+}
 
 #endif // __TFT_MENU_H__
