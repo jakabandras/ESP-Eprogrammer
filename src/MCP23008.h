@@ -4,10 +4,14 @@
 #include <Arduino.h>
 #include <Wire.h>
 
+#define IODIR 0x00
+#define GPIO_ 0x09
+
 class MCP23008
 {
 public:
   MCP23008();
+  MCP23008(uint8_t addr);
   void begin();
   void pinMode(uint8_t pin, uint8_t mode);
   void digitalWrite(uint8_t pin, uint8_t value);

@@ -124,6 +124,22 @@ private:
 	String actDir = "/";
 	String _dChars[2] = {"[", "]"};
 	std::vector<String> dirHistory;
+	void printSpaces(int8_t spaces = 1);
+	TFT_eSPI *tft;
+	Joystick *joystick;
+	int8_t _ButtonPin = 0;
+	int font;
+	int16_t fontHeight;
+	int16_t fontWidth;
+	uint8_t maxChars;
+	uint8_t maxLines;
+
+	uint16_t hF = TFT_BLUE;		// Fejléc szöveg színe
+	uint16_t hB = TFT_YELLOW; // Fejléc háttér színe
+	uint16_t nF = TFT_WHITE;	// Normál szöveg színe
+	uint16_t nB = TFT_BLUE;		// Normál szöveg háttér színe
+	uint16_t sF = TFT_WHITE;	// Kiválasztott szöveg színe
+	uint16_t sB = TFT_RED;		// Kiválasztott szöveg háttér színe
 
 	void readFiles();
 	void processDir(String getDir);
@@ -136,6 +152,6 @@ void string_split(std::string const &s, char sep, OutputIterator output, bool sk
 
 	std::copy(std::sregex_token_iterator(std::begin(s), std::end(s), rxSplit, -1),
 						std::sregex_token_iterator(), output);
-}
+};
 
 #endif // __TFT_MENU_H__

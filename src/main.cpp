@@ -136,48 +136,155 @@ WiFiUDP udp;
 std::vector<MENU> xMenuItems;
 
 String fonts[30] = {
-    "Arial14", "Arial-BoldMT-14", "Arial-Black-14", "Calibri-Bold-14", "Georgia-Bold-14", "Impact-14", "InkFree-14", "LeelawadeeUI-14", "MVBoli-14"};
+    "Arial14", "Arial-BoldMT-14"
+    ,"Arial-Black-14"
+    ,"Calibri-Bold-14"
+    ,"Georgia-Bold-14"
+    ,"Impact-14"
+    ,"InkFree-14"
+    ,"LeelawadeeUI-14"
+    ,"MVBoli-14"
+  };
 
 String bitmaps[50] = {
     "/Betti2.bmp"};
 
 // Menük
-SELECT(selRomType, mnuRomtype, "Rom típus :", doNothing, noEvent, noStyle, VALUE("Retro(27.../17...)", 0, doNothing, noEvent), VALUE("Modern", 1, doNothing, noEvent), VALUE("I2C", 2, doNothing, noEvent), VALUE("SPI", 3, doNothing, noEvent));
-SELECT(selWriteVoltage, mnuVoltage, "Égető feszültség :", doNothing, noEvent, noStyle, VALUE("5V", 0, doNothing, noEvent), VALUE("6V", 1, doNothing, noEvent), VALUE("12V", 2, doNothing, noEvent), VALUE("21V", 3, doNothing, noEvent), VALUE("25V", 4, doNothing, noEvent));
+SELECT(selRomType, mnuRomtype, "Rom típus :", doNothing, noEvent, noStyle
+  ,VALUE("Retro(27.../17...)", 0, doNothing, noEvent)
+  ,VALUE("Modern", 1, doNothing, noEvent)
+  ,VALUE("I2C", 2, doNothing, noEvent)
+  ,VALUE("SPI", 3, doNothing, noEvent)
+);
+
+SELECT(selWriteVoltage, mnuVoltage, "Égető feszültség :", doNothing, noEvent, noStyle
+  ,VALUE("5V", 0, doNothing, noEvent)
+  ,VALUE("6V", 1, doNothing, noEvent)
+  ,VALUE("12V", 2, doNothing, noEvent)
+  ,VALUE("21V", 3, doNothing, noEvent)
+  ,VALUE("25V", 4, doNothing, noEvent)
+);
+
 TOGGLE(Myconfig.romCheck, mnuRomCheck, "Ellenőrzés írás után :", doNothing, noEvent, noStyle //,doExit,enterEvent,noStyle
-       ,
-       VALUE("BE", 1, doNothing, noEvent), VALUE("KI", 0, doNothing, noEvent));
+       ,VALUE("BE", 1, doNothing, noEvent)
+       ,VALUE("KI", 0, doNothing, noEvent)
+);
+
 int selFont = 0;
-SELECT(selFont, mnuFont, "Betűtípus :", actFontChange, exitEvent, noStyle, VALUE("Arial14", 0, doNothing, noEvent), VALUE("Arial-BoldMT-14", 1, doNothing, noEvent), VALUE("Arial-Black-14", 2, doNothing, noEvent), VALUE("Calibri-Bold-14", 3, doNothing, noEvent), VALUE("Georgia-Bold-14", 4, doNothing, noEvent), VALUE("Impact-14", 5, doNothing, noEvent), VALUE("InkFree-14", 6, doNothing, noEvent), VALUE("LeelawadeeUI-14", 7, doNothing, noEvent), VALUE("MVBoli-14", 8, doNothing, noEvent));
+SELECT(selFont, mnuFont, "Betűtípus :", actFontChange, exitEvent, noStyle
+  ,VALUE("Arial14", 0, doNothing, noEvent)
+  ,VALUE("Arial-BoldMT-14", 1, doNothing, noEvent)
+  ,VALUE("Arial-Black-14", 2, doNothing, noEvent)
+  ,VALUE("Calibri-Bold-14", 3, doNothing, noEvent)
+  ,VALUE("Georgia-Bold-14", 4, doNothing, noEvent)
+  ,VALUE("Impact-14", 5, doNothing, noEvent)
+  ,VALUE("InkFree-14", 6, doNothing, noEvent)
+  ,VALUE("LeelawadeeUI-14", 7, doNothing, noEvent)
+  ,VALUE("MVBoli-14", 8, doNothing, noEvent)
+);
 
-MENU(mnuEprom, "EPROM műveletek", doNothing, noEvent, noStyle, SUBMENU(mnuRomtype), SUBMENU(mnuVoltage), SUBMENU(mnuRomCheck), EDIT("Fájl név :", fname, alphaNumMask, doNothing, noEvent, noStyle), OP("Rom kiolvasása", actRomRead, enterEvent), OP("Rom írása", actRomWrite, enterEvent), OP("Rom törlése", actRomErase, enterEvent), OP("Rom törlése (gyors)", actRomEraseFast, enterEvent), OP("Rom ellenőrzése", actRomCheck, enterEvent), EXIT("<Vissza"));
+MENU(mnuEprom, "EPROM műveletek", doNothing, noEvent, noStyle
+  ,SUBMENU(mnuRomtype)
+  ,SUBMENU(mnuVoltage)
+  ,SUBMENU(mnuRomCheck)
+  ,EDIT("Fájl név :", fname, alphaNumMask, doNothing, noEvent, noStyle)
+  ,OP("Rom kiolvasása", actRomRead, enterEvent)
+  ,OP("Rom írása", actRomWrite, enterEvent)
+  ,OP("Rom törlése", actRomErase, enterEvent)
+  ,OP("Rom törlése (gyors)", actRomEraseFast, enterEvent)
+  ,OP("Rom ellenőrzése", actRomCheck, enterEvent)
+  ,EXIT("<Vissza")
+);
 
-MENU(mnuFile, "Fájl műveletek", doNothing, noEvent, noStyle, OP("Fájlok listázása", actListFiles, enterEvent), OP("Fájl törlése", doNothing, enterEvent), OP("Fájl átnevezése", doNothing, enterEvent), OP("Fájl küldése", doNothing, enterEvent), OP("Fájl fogadása", doNothing, enterEvent), EXIT("<Vissza"));
+MENU(mnuFile, "Fájl műveletek", doNothing, noEvent, noStyle
+  ,OP("Fájlok listázása", actListFiles, enterEvent)
+  ,OP("Fájl törlése", doNothing, enterEvent)
+  ,OP("Fájl átnevezése", doNothing, enterEvent)
+  ,OP("Fájl küldése", doNothing, enterEvent)
+  ,OP("Fájl fogadása", doNothing, enterEvent)
+  ,EXIT("<Vissza")
+);
 
-SELECT(Myconfig.conType, mnuConType, "Kapcsolat :", actSelConnect, exitEvent, noStyle, VALUE("UDP", 0, doNothing, noEvent), VALUE("HTTP", 1, doNothing, noEvent), VALUE("USB/Serial", 2, doNothing, noEvent));
+SELECT(Myconfig.conType, mnuConType, "Kapcsolat :", actSelConnect, exitEvent, noStyle
+  ,VALUE("UDP", 0, doNothing, noEvent)
+  ,VALUE("HTTP", 1, doNothing, noEvent)
+  ,VALUE("USB/Serial", 2, doNothing, noEvent)
+);
+
 // Kapcsolódások menü
-MENU(mnuConnections, "Csatlakozások", doNothing, noEvent, noStyle, SUBMENU(mnuConType), EDIT("SSID :", Myconfig.ssid, alphaNumMask, doNothing, noEvent, noStyle), EDIT("Jelszó :", Myconfig.pass, alphaNumMask, doNothing, noEvent, noStyle), EDIT("IP cím :", Myconfig.ipaddr, alphaNumMask, doNothing, noEvent, noStyle), FIELD(Myconfig.udpport, "Port :", "", 0, 65535, 1, 1, doNothing, noEvent, noStyle), EXIT("<Vissza"));
+MENU(mnuConnections, "Csatlakozások", doNothing, noEvent, noStyle
+  ,SUBMENU(mnuConType)
+  ,EDIT("SSID :", Myconfig.ssid, alphaNumMask, doNothing, noEvent, noStyle)
+  ,EDIT("Jelszó :", Myconfig.pass, alphaNumMask, doNothing, noEvent, noStyle)
+  ,EDIT("IP cím :", Myconfig.ipaddr, alphaNumMask, doNothing, noEvent, noStyle)
+  ,FIELD(Myconfig.udpport, "Port :", "", 0, 65535, 1, 1, doNothing, noEvent, noStyle)
+  ,EXIT("<Vissza")
+);
+
 // Eprom bináros tárolása menü
-SELECT(Myconfig.fileStorage, mnuStorage, "Romok tárolása :", doNothing, noEvent, noStyle, VALUE("Flash", 0, doNothing, noEvent), VALUE("SD kártya", 1, doNothing, noEvent));
+SELECT(Myconfig.fileStorage, mnuStorage, "Romok tárolása :", doNothing, noEvent, noStyle
+  ,VALUE("Flash", 0, doNothing, noEvent)
+  ,VALUE("SD kártya", 1, doNothing, noEvent)
+);
 
-SELECT(Myconfig.scrTajol, mnuScrTajol, "Kijelző tájolása :", actScrTajol, exitEvent, noStyle, VALUE("Függőleges", 0, doNothing, noEvent), VALUE("Vízszintes", 1, doNothing, noEvent), VALUE("Függőleges tükrözve", 2, doNothing, noEvent), VALUE("Vízszintes tükrözve", 3, doNothing, noEvent));
+SELECT(Myconfig.scrTajol, mnuScrTajol, "Kijelző tájolása :", actScrTajol, exitEvent, noStyle
+  ,VALUE("Függőleges", 0, doNothing, noEvent), VALUE("Vízszintes", 1, doNothing, noEvent)
+  ,VALUE("Függőleges tükrözve", 2, doNothing, noEvent)
+  ,VALUE("Vízszintes tükrözve", 3, doNothing, noEvent)
+);
 
-SELECT(Myconfig.splash, mnuSplash, "Bejelentkező kép", doNothing, noEvent, noStyle, VALUE("Bekapcsolva", 1, doNothing, noEvent), VALUE("Kikapcsolva", 0, doNothing, noEvent));
+SELECT(Myconfig.splash, mnuSplash, "Bejelentkező kép", doNothing, noEvent, noStyle
+  ,VALUE("Bekapcsolva", 1, doNothing, noEvent)
+  ,VALUE("Kikapcsolva", 0, doNothing, noEvent)
+);
 
-SELECT(Myconfig.showBoot, mnuBootProcess, "Betöltési folyamat", doNothing, noEvent, noStyle, VALUE("Bekapcsolva", 1, doNothing, noEvent), VALUE("Kikapcsolva", 0, doNothing, noEvent));
+SELECT(Myconfig.showBoot, mnuBootProcess, "Betöltési folyamat", doNothing, noEvent, noStyle
+  ,VALUE("Bekapcsolva", 1, doNothing, noEvent)
+  ,VALUE("Kikapcsolva", 0, doNothing, noEvent)
+);
 
-MENU(mnuBoot, "Betöltési folyamat", doNothing, noEvent, noStyle, SUBMENU(mnuSplash), OP("Splash képernyő", actSplash, enterEvent));
+MENU(mnuBoot, "Betöltési folyamat", doNothing, noEvent, noStyle
+  ,SUBMENU(mnuSplash)
+  ,OP("Splash képernyő", actSplash, enterEvent)
+  ,EXIT("<Vissza")
+);
 
 // Kijelző beállítása menü
-MENU(mnuScreen, "Kijelző beállítása", doNothing, noEvent, noStyle, SUBMENU(mnuFont), SUBMENU(mnuScrTajol), FIELD(Myconfig.scale, "Kijelző mérete :", "", 1, 3, 0.1, 1, actChangeScale, exitEvent, noStyle), SUBMENU(mnuBoot), OP("Kijelző teszt", actScreenTest, enterEvent), OP("Kijelző beállítása", doNothing, enterEvent), EXIT("<Vissza"));
+MENU(mnuScreen, "Kijelző beállítása", doNothing, noEvent, noStyle
+  ,SUBMENU(mnuFont), SUBMENU(mnuScrTajol)
+  ,FIELD(Myconfig.scale, "Kijelző mérete :", "", 1, 3, 0.1, 1, actChangeScale, exitEvent, noStyle)
+  ,SUBMENU(mnuBoot)
+  ,OP("Kijelző teszt", actScreenTest, enterEvent)
+  ,OP("Kijelző beállítása", doNothing, enterEvent)
+  ,EXIT("<Vissza")
+);
 
-MENU(mnuReceiveSettings, "Beállítások fogadása", doNothing, noEvent, noStyle, OP("Beállítások fogadása UDP-n", doNothing, enterEvent), OP("Beállítások fogadása HTTP-n", doNothing, enterEvent), OP("Beállítások fogadása USB-n", doNothing, enterEvent), OP("Beállítások küldése USB-n", actListSettings, enterEvent), EXIT("<Vissza"));
+MENU(mnuReceiveSettings, "Beállítások fogadása", doNothing, noEvent, noStyle
+  ,OP("Beállítások fogadása UDP-n", doNothing, enterEvent)
+  ,OP("Beállítások fogadása HTTP-n", doNothing, enterEvent)
+  ,OP("Beállítások fogadása USB-n", doNothing, enterEvent)
+  ,OP("Beállítások küldése USB-n", actListSettings, enterEvent)
+  ,EXIT("<Vissza")
+);
 
 // Beállítások menü
-MENU(mnuMySettings, "Beállítások", doNothing, noEvent, noStyle, SUBMENU(mnuConnections), SUBMENU(mnuStorage), SUBMENU(mnuScreen), OP("Button teszt", actTestButton, enterEvent), OP("Beállítások mentése", actSaveSettings, enterEvent), OP("Beállítások betöltése", actLoadSettings, enterEvent), OP("Beállitások alaphelyzetbe állítása", doNothing, enterEvent), SUBMENU(mnuReceiveSettings), OP("Újraindítás", actRestart, enterEvent), EXIT("<Vissza"));
+MENU(mnuMySettings, "Beállítások", doNothing, noEvent, noStyle
+  ,SUBMENU(mnuConnections), SUBMENU(mnuStorage)
+  ,SUBMENU(mnuScreen), OP("Button teszt", actTestButton, enterEvent)
+  ,OP("Beállítások mentése", actSaveSettings, enterEvent)
+  ,OP("Beállítások betöltése", actLoadSettings, enterEvent)
+  ,OP("Beállitások alaphelyzetbe állítása", doNothing, enterEvent)
+  ,SUBMENU(mnuReceiveSettings), OP("Újraindítás", actRestart, enterEvent)
+  ,EXIT("<Vissza")
+);
 
 // Főmenü
-MENU(mainMenu, "Főmenü", zZz, noEvent, wrapStyle, SUBMENU(mnuEprom), SUBMENU(mnuFile), SUBMENU(mnuMySettings), EXIT("<Back"));
+MENU(mainMenu, "Főmenü", zZz, noEvent, wrapStyle
+  ,SUBMENU(mnuEprom)
+  ,SUBMENU(mnuFile)
+  ,SUBMENU(mnuMySettings)
+  ,EXIT("<Vissza")
+);
 
 #define GFX_WIDTH 480
 #define GFX_HEIGHT 320

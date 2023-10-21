@@ -5,6 +5,11 @@ MCP23008::MCP23008()
   address = 0x20; // Default I2C address
 }
 
+MCP23008::MCP23008(uint8_t addr)
+{
+  address = addr;
+}
+
 void MCP23008::begin()
 {
   Wire.begin();
@@ -36,7 +41,7 @@ void MCP23008::digitalWrite(uint8_t pin, uint8_t value)
   if (pin < 8)
   {
     // Write HIGH (1) or LOW (0) to the specified pin
-    uint8_t regValue = readRegister(GPIO);
+    uint8_t regValue = readRegister(GPIO_);
     if (value == HIGH)
     {
       regValue |= (1 << pin); // Set bit to 1 for HIGH
@@ -45,7 +50,7 @@ void MCP23008::digitalWrite(uint8_t pin, uint8_t value)
     {
       regValue &= ~(1 << pin); // Set bit to 0 for LOW
     }
-    writeRegister(GPIO, regValue);
+    writeRegister(GPIO_, regValue);
   }
 }
 
@@ -55,7 +60,7 @@ uint8_t MCP23008::digitalRead(uint8_t pin)
   if (pin < 8)
   {
     // Read the state of the specified pin
-    uint8_t regValue = readRegister(GPIO);
+    uint8_t regValue = readRegister(GPIO_);
     return (regValue >> pin) & 0x01;
   }
   return LOW;
