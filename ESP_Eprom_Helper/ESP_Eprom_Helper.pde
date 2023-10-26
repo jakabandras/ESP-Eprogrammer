@@ -4,7 +4,10 @@ import uibooster.model.*;
 import uibooster.model.formelements.*;
 import uibooster.model.options.*;
 import uibooster.utils.*;
-
+import com.bckmnn.udp.*;
+import java.net.InetSocketAddress;
+import java.net.InetAddress;
+import java.net.SocketAddress;
 import hypermedia.net.*;
 
 UDP udp;
@@ -13,10 +16,14 @@ Form form;
 UiBooster booster;
 boolean selected = false;
 PImage image;
+boolean received = false;
 
 void setup() {
   size(800,400);
-  udp = new UDP(this,5000);
+  udp = new UDP(this,666);
+  udp.log(true);
+  udp.loopback(true);
+  udp.listen(true);
   
   textAlign(CENTER, CENTER);
   
@@ -26,10 +33,19 @@ void setup() {
     .addMenu("Fájl küldése", ()->sendFile())
     .addMenu("Fájl fogadása",()->receiveFile())
     .addMenu("Kilépés",()->exit());
-  udp.log(true);
-  udp.loopback(true);
-  udp.listen();
   
+}
+void sendFileInChunks(String fn) {
+  byte[] buffer = loadBytes(fn);
+  int start = 0;
+  while (start < buffer.length) {
+    int end = min(start+512,buffer.length-start);
+    byte[] chunk = subset(buffer,start,end);
+    udp.send(chunk,"192.168.1.6",1234);
+    while(!received) {};
+    start += 512;
+    
+  }
 }
 
 void sendFile() {
@@ -39,12 +55,13 @@ void sendFile() {
   image.save("d:\\ArduinoSoftwares\\ESP Eprogrammer\\DATA\\"+file.getName()+".bmp");
   println(file.getAbsolutePath());
   booster.showPicture("Küldendő kép",file).showImage();
-  // image.resize(320,480);
-  // image(image,0,0);
   int fsize = (int)file.length();
-  udp.send("PUTIMAGE|"+file.getAbsolutePath()+"|"+fsize,"192.168.1.5",1234);
+  String xxx = "PUTFILE|"+file.getAbsolutePath()+"|"+String.valueOf(fsize);
+  udp.send(xxx,"192.168.1.6",1234);
+  
   if (file.exists()) {
     selected = true;
+    sendFileInChunks(file.getAbsolutePath());
   }
 }
 
@@ -131,4 +148,16 @@ void convertTo16BitJPG(String inputFileName, String outputFileName) {
   convertedImg.save(outputFileName);
   
   println("A fájl sikeresen átkonvertálva és elmentve: " + outputFileName);
+}
+
+void receive( byte[] data, String ip, int port ) {  // <-- extended handler
+  
+  
+  // get the "real" message =
+  // forget the ";\n" at the end <-- !!! only for a communication with Pd !!!
+  data = subset(data, 0, data.length-2);
+  String message = new String( data );
+  if (message == "DONE" ) received = true;
+  // print the result
+  println( "receive: \""+message+"\" from "+ip+" on port "+port );
 }

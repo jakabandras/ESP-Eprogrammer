@@ -145,13 +145,5 @@ private:
 	void processDir(String getDir);
 };
 
-template <typename OutputIterator>
-void string_split(std::string const &s, char sep, OutputIterator output, bool skip_empty = true)
-{
-	std::regex rxSplit(std::string("\\") + sep + (skip_empty ? "+" : ""));
-
-	std::copy(std::sregex_token_iterator(std::begin(s), std::end(s), rxSplit, -1),
-						std::sregex_token_iterator(), output);
-};
 
 #endif // __TFT_MENU_H__

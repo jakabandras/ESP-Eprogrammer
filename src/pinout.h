@@ -19,4 +19,7 @@
 #define TFT_MOSI 23
 #define TFT_MISO 19
 #define TFT_SCLK 18
-#define TFT_LED  15
+//#define TFT_LED  15
+
+#define I2C_SDA     15
+#define I2C_SDC     16
