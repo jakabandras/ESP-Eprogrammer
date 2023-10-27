@@ -1617,12 +1617,63 @@ void receiveFile(String fname, uint32_t size,WiFiClient clt) {
   const char* msgdone = "DONE";
   const char* errorMsg = "ERROR";
   bool error = false;
+  uint32_t expectedCRC = 0; // Várható CRC érték inicializálása
   File rcvFile = FFat.open("/" + fname, "w");
   if (rcvFile) {
-
+    clt.print("WAITING_TO_FILE");
+    while (!clt.available()) {
+      delayMicroseconds(10);
+    };
+    while (clt.available())
+    {
+      uint8_t bt = clt.read();
+      crc.update(&bt,1);
+      received++;
+      try
+      {
+        rcvFile.write(bt);
+      }
+      catch(const std::exception& e)
+      {
+        linePrint(e.what());
+        clt.print(errorMsg);
+        rcvFile.close();
+        FFat.remove("/" + fname);
+        return;
+      } 
+    }
+    if (received == size) {
+      clt.print("TRANSFER_OK");
+      linePrint("A fájl átvitel megtörtént, CRC ellenőrzés...");
+      while (!clt.available())
+      {
+        delayMicroseconds(10);
+      };
+      expectedCRC = clt.parseInt();
+      if (crc.finalize() == expectedCRC) {
+        clt.print("CRC_OK");
+        linePrint("A CRC ellenőrzés sikeres!");
+      } else {
+        clt.print("CRC_NOK");
+        linePrint("HIBÁS CRC!!!");
+        rcvFile.close();
+        FFat.remove("/" + fname);
+        return;
+      }
+    } else { // Eltérő fájlméret
+      linePrint("A fájl méret nem megfelelő!");
+      clt.print("TRANSFER_NOK");
+      rcvFile.close();
+      FFat.remove("/" + fname);
+      return;
+    }
   } else {
     linePrint("\nHiba a(z) "+fname+" létrehozásakor!");
+    rcvFile.close();
+    FFat.remove("/" + fname);
+    return;
   }
+  rcvFile.close();
 }
 
 std::vector<String> bytes2hexStrin(byte buff[], uint32_t len)

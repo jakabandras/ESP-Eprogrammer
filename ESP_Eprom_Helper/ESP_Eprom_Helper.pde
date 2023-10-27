@@ -4,28 +4,24 @@ import uibooster.model.*;
 import uibooster.model.formelements.*;
 import uibooster.model.options.*;
 import uibooster.utils.*;
-import com.bckmnn.udp.*;
-import java.net.InetSocketAddress;
-import java.net.InetAddress;
-import java.net.SocketAddress;
-import hypermedia.net.*;
+import processing.net.*;
+import java.util.zip.CRC32;
 
-UDP udp;
 File file;
 Form form;
 UiBooster booster;
 boolean selected = false;
 PImage image;
 boolean received = false;
+Client client;
+CRC32 crc;
 
 void setup() {
   size(800,400);
-  udp = new UDP(this,666);
-  udp.log(true);
-  udp.loopback(true);
-  udp.listen(true);
   
   textAlign(CENTER, CENTER);
+  client = new Client(this, "192.168.1.6", 1234);
+  crc = new CRC32();
   
   booster = new UiBooster();
   booster.createTrayMenu("ESP Eprom Helper","clown.png")
@@ -35,16 +31,32 @@ void setup() {
     .addMenu("Kilépés",()->exit());
   
 }
-void sendFileInChunks(String fn) {
-  byte[] buffer = loadBytes(fn);
-  int start = 0;
-  while (start < buffer.length) {
-    int end = min(start+512,buffer.length-start);
-    byte[] chunk = subset(buffer,start,end);
-    udp.send(chunk,"192.168.1.6",1234);
-    while(!received) {};
-    start += 512;
-    
+
+void sendBinaryFile(String filePath) {
+  // Megnyitja a bináris fájlt és elküldi a tartalmát a szervernek
+  File file = new File(filePath);
+  if (file.exists()) {
+    byte[] data = loadBytes(file);
+    for (byte b : data) {
+      client.write(b);
+      if (client.available()>0) {
+        String resp = client.readString();
+        if (resp.compareTo("ERROR") == 0) {
+          println("Hiba az átvitel során!");
+          return;
+        }
+      }
+      crc.update(b);
+    }
+    while (client.available() == 0) {};
+    String msg = client.readString();
+    if (msg.compareTo("TRANSFER_OK") == 0) {
+      println("A fájl átvitele sikeres, CRC ellenőrzés");
+      client.write(str(crc.getValue()));
+      
+    }
+  } else {
+    println("Nem találom a fájlt!");
   }
 }
 
@@ -52,16 +64,20 @@ void sendFile() {
   file = booster.showFileSelection("*.jpg");
   image = loadImage(file.getAbsolutePath());
   image.resize(320,480);
-  image.save("d:\\ArduinoSoftwares\\ESP Eprogrammer\\DATA\\"+file.getName()+".bmp");
+  //image.save("d:\\ArduinoSoftwares\\ESP Eprogrammer\\DATA\\"+file.getName()+".bmp");
   println(file.getAbsolutePath());
   booster.showPicture("Küldendő kép",file).showImage();
   int fsize = (int)file.length();
   String xxx = "PUTFILE|"+file.getAbsolutePath()+"|"+String.valueOf(fsize);
-  udp.send(xxx,"192.168.1.6",1234);
-  
+  client.write(xxx);
   if (file.exists()) {
+    String resp = "";
+    while (resp.compareTo("WAITING_TO_FILE") != 0) {
+      while (client.available() == 0) {};
+      resp =  client.readString();
+    };
     selected = true;
-    sendFileInChunks(file.getAbsolutePath());
+    sendBinaryFile(file.getAbsolutePath());
   }
 }
 
